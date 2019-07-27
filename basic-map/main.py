@@ -26,7 +26,7 @@ import os
 
 base = ShowBase()
 base.disableMouse()
-base.camera.setPos(30, -60, 30)
+base.camera.setPos(40, -100, 20)
 base.camera.lookAt(0, 0, 0)
 #base.camera.setPos(0, 0, 1.5)
 #base.camera.lookAt(0, 1, 1.4)
@@ -117,7 +117,7 @@ def makeTerrainCube():
     return terrainCube
 
 testTexture = loader.loadTexture("grass.png")
-terrainSize = 20
+terrainSize = 60
 x0 = terrainSize / 2
 y0 = terrainSize / 2
 for i in range(terrainSize):
