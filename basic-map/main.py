@@ -109,16 +109,18 @@ def makeTerrainCube():
         tris.addVertices(4*(x+1), 4*(x+1)+1, 4*(x+1)+2)
         tris.addVertices(4*(x+1), 4*(x+1)+2, 4*(x+1)+3)
 
-    for x in range(4):
-        color.addData4f(0.6, 0.2, 0.2, 1.0)
-        color.addData4f(0.6, 0.2, 0.2, 1.0)
-        color.addData4f(0.0, 0.8, 0.4, 1.0)
-        color.addData4f(0.0, 0.8, 0.4, 1.0)    
+    for x in range(16):
+        color.addData4f(0.6, 0.4, 0.2, 1.0)
 
-    for x in range(5):
+    for x in range(1):
         texcoord.addData2f(0.0, 0.0)
-        texcoord.addData2f(1.0, 0.0)
+        texcoord.addData2f(0.5, 0.0)
         texcoord.addData2f(0.0, 1.0)
+        texcoord.addData2f(0.5, 1.0)
+    for x in range(4):
+        texcoord.addData2f(0.5, 0.0)
+        texcoord.addData2f(1.0, 0.0)
+        texcoord.addData2f(0.5, 1.0)
         texcoord.addData2f(1.0, 1.0)
 
     terrainCube = Geom(vdata)
@@ -131,51 +133,16 @@ snode.addGeom(terrainCube0)
 cube = render.attachNewNode(snode)
 cube.setTwoSided(True)
 
-class MyTapper(DirectObject):
+testTexture = loader.loadTexture("grass.png")
+cube.setTexture(testTexture)
 
-    def __init__(self):
-        self.testTexture = loader.loadTexture("maps/envir-reeds.png")
-        self.accept("1", self.toggleTex)
-        self.accept("2", self.toggleLightsSide)
-        self.accept("3", self.toggleLightsUp)
+slight = Spotlight('slight')
+slight.setColor((1, 1, 1, 1))
+lens = PerspectiveLens()
+slight.setLens(lens)
+slnp = render.attachNewNode(slight)
+render.setLight(slnp)
+slnp.setPos(cube, -5, -10, 20)
+slnp.lookAt(0, 0, 0)
 
-        self.LightsOn = False
-        self.LightsOn1 = False
-        slight = Spotlight('slight')
-        slight.setColor((1, 1, 1, 1))
-        lens = PerspectiveLens()
-        slight.setLens(lens)
-        self.slnp = render.attachNewNode(slight)
-        self.slnp1 = render.attachNewNode(slight)
-
-    def toggleTex(self):
-        global cube
-        if cube.hasTexture():
-            cube.setTextureOff(1)
-        else:
-            cube.setTexture(self.testTexture)
-
-    def toggleLightsSide(self):
-        global cube
-        self.LightsOn = not self.LightsOn
-
-        if self.LightsOn:
-            render.setLight(self.slnp)
-            self.slnp.setPos(cube, 10, -400, 0)
-            self.slnp.lookAt(10, 0, 0)
-        else:
-            render.setLightOff(self.slnp)
-
-    def toggleLightsUp(self):
-        global cube
-        self.LightsOn1 = not self.LightsOn1
-
-        if self.LightsOn1:
-            render.setLight(self.slnp1)
-            self.slnp1.setPos(cube, 10, 0, 400)
-            self.slnp1.lookAt(10, 0, 0)
-        else:
-            render.setLightOff(self.slnp1)
-
-t = MyTapper()
 base.run()
