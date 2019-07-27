@@ -26,25 +26,12 @@ import os
 
 base = ShowBase()
 base.disableMouse()
-base.camera.setPos(10, -20, 10)
+base.camera.setPos(20, -40, 20)
 base.camera.lookAt(0, 0, 0)
 
-title = OnscreenText(text="Panda3D: Tutorial - Making a Cube Procedurally",
+title = OnscreenText(text="Create a Basic Map",
                      style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
                      parent=base.a2dBottomRight, align=TextNode.ARight)
-escapeEvent = OnscreenText(text="1: Set a Texture onto the Cube",
-                           style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.08),
-                           align=TextNode.ALeft, scale=.05,
-                           parent=base.a2dTopLeft)
-spaceEvent = OnscreenText(text="2: Toggle Light from the front On/Off",
-                          style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.14),
-                          align=TextNode.ALeft, scale=.05,
-                          parent=base.a2dTopLeft)
-upDownEvent = OnscreenText(text="3: Toggle Light from on top On/Off",
-                           style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.20),
-                           align=TextNode.ALeft, scale=.05,
-                           parent=base.a2dTopLeft)
-
 
 # You can't normalize inline so this is a helper function
 def normalized(*args):
@@ -115,26 +102,29 @@ def makeTerrainCube():
     for x in range(1):
         texcoord.addData2f(0.0, 0.0)
         texcoord.addData2f(0.5, 0.0)
-        texcoord.addData2f(0.0, 1.0)
         texcoord.addData2f(0.5, 1.0)
+        texcoord.addData2f(0.0, 1.0)
     for x in range(4):
         texcoord.addData2f(0.5, 0.0)
         texcoord.addData2f(1.0, 0.0)
-        texcoord.addData2f(0.5, 1.0)
         texcoord.addData2f(1.0, 1.0)
+        texcoord.addData2f(0.5, 1.0)
 
     terrainCube = Geom(vdata)
     terrainCube.addPrimitive(tris)
     return terrainCube
 
-terrainCube0 = makeTerrainCube()
-snode = GeomNode('terrainCube')
-snode.addGeom(terrainCube0)
-cube = render.attachNewNode(snode)
-cube.setTwoSided(True)
-
 testTexture = loader.loadTexture("grass.png")
-cube.setTexture(testTexture)
+terrainSize = 20
+for x in range(terrainSize):
+    for y in range(terrainSize):
+        snode = GeomNode('terrainPatch')
+        terrainCube = makeTerrainCube()
+        snode.addGeom(terrainCube)
+        cube = render.attachNewNode(snode)
+        cube.setTwoSided(True)
+        cube.setTexture(testTexture)
+        cube.setPos(2*x-terrainSize, 2*y-terrainSize, 0)
 
 slight = Spotlight('slight')
 slight.setColor((1, 1, 1, 1))
@@ -142,7 +132,7 @@ lens = PerspectiveLens()
 slight.setLens(lens)
 slnp = render.attachNewNode(slight)
 render.setLight(slnp)
-slnp.setPos(cube, -5, -10, 20)
+slnp.setPos(cube, -20, -40, 80)
 slnp.lookAt(0, 0, 0)
 
 base.run()
