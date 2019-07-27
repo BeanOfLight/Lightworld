@@ -18,7 +18,7 @@ from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import Texture, GeomNode
 from panda3d.core import PerspectiveLens
 from panda3d.core import CardMaker
-from panda3d.core import Light, Spotlight
+from panda3d.core import Light, Spotlight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
 import sys
@@ -26,8 +26,10 @@ import os
 
 base = ShowBase()
 base.disableMouse()
-base.camera.setPos(20, -40, 20)
+base.camera.setPos(30, -60, 30)
 base.camera.lookAt(0, 0, 0)
+#base.camera.setPos(0, 0, 1.5)
+#base.camera.lookAt(0, 1, 1.4)
 
 title = OnscreenText(text="Create a Basic Map",
                      style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
@@ -116,15 +118,25 @@ def makeTerrainCube():
 
 testTexture = loader.loadTexture("grass.png")
 terrainSize = 20
-for x in range(terrainSize):
-    for y in range(terrainSize):
+x0 = terrainSize / 2
+y0 = terrainSize / 2
+for i in range(terrainSize):
+    for j in range(terrainSize):
         snode = GeomNode('terrainPatch')
         terrainCube = makeTerrainCube()
         snode.addGeom(terrainCube)
         cube = render.attachNewNode(snode)
         cube.setTwoSided(True)
         cube.setTexture(testTexture)
-        cube.setPos(2*x-terrainSize, 2*y-terrainSize, 0)
+        x = 2*i-terrainSize
+        y = 2*j-terrainSize
+        z = round(max([4-((x-x0)**2+(y-y0)**2) / 50,0]))
+        cube.setPos(x, y, z)
+
+alight = AmbientLight('alight')
+alight.setColor((0.4, 0.4, 0.4, 1))
+alnp = render.attachNewNode(alight)
+render.setLight(alnp)
 
 slight = Spotlight('slight')
 slight.setColor((1, 1, 1, 1))
