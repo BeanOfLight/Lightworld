@@ -35,13 +35,6 @@ title = OnscreenText(text="Create a Basic Map",
                      style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
                      parent=base.a2dBottomRight, align=TextNode.ARight)
 
-# You can't normalize inline so this is a helper function
-def normalized(*args):
-    myVec = LVector3(*args)
-    myVec.normalize()
-    return myVec
-
-
 def makeTerrainCube():
     
     format = GeomVertexFormat.getV3n3cpt2()
@@ -117,7 +110,7 @@ def makeTerrainCube():
     return terrainCube
 
 testTexture = loader.loadTexture("grass.png")
-terrainSize = 60
+terrainSize = 100
 x0 = terrainSize / 2
 y0 = terrainSize / 2
 for i in range(terrainSize):
