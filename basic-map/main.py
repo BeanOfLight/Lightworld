@@ -74,13 +74,15 @@ class LightworldBasic(ShowBase):
         self.avatar.reparentTo(render)
         self.avatar.setScale(0.25)
         self.avatar.setPos(0,0,terrain.getHeightAtPos(0,0)+1)
-        self.avatar.lookAt(0,-1,1)
+        self.avatar.lookAt(0,1,1)
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
      #   self.accept("arrow_left", self.turnLeft)
      #   self.accept("arrow_right", self.turnRight)
-     #   self.accept("arrow_up", self.moveForward)
+        self.accept("arrow_up", self.moveForward)
+
+        taskMgr.add(self.move, "moveTask")
 
         # Set up the camera
         self.disableMouse()
@@ -97,7 +99,7 @@ class LightworldBasic(ShowBase):
         self.avatarGroundRay = CollisionRay()
         self.avatarGroundRay.setOrigin(0, 0, 9)
         self.avatarGroundRay.setDirection(0, 0, -1)
-        self.avatarGroundCol = CollisionNode('ralphRay')
+        self.avatarGroundCol = CollisionNode('avatarRay')
         self.avatarGroundCol.addSolid(self.avatarGroundRay)
         self.avatarGroundCol.setFromCollideMask(CollideMask.bit(0))
         self.avatarGroundCol.setIntoCollideMask(CollideMask.allOff())
@@ -122,6 +124,30 @@ class LightworldBasic(ShowBase):
         dlnp = render.attachNewNode(dlight)
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
+
+    moveTriggered = False
+    moving = False
+    moveTarget = LVector3(0,0,0)
+    
+    def moveForward(self):
+        if(self.moving == False):
+            self.moveTriggered = True
+
+    def move(self, task):
+        if(self.moveTriggered == True):
+            self.moving = True
+            self.moveTriggered = False
+            self.moveTarget = self.avatar.getPos() + LVector3(0,2,0)
+
+        if(self.moving == True):
+            self.avatar.setY(self.avatar.getY()+0.05)
+            if(self.avatar.getY() >= self.moveTarget.getY()):
+                self.moving = False
+        
+        if(self.avatar.getY()-self.camera.getY() > 3):
+            self.camera.setY(self.camera.getY()+0.05)
+        
+        return task.cont
 
 demo = LightworldBasic()
 demo.run()
