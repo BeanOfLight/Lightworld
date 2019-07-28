@@ -27,7 +27,7 @@ from panda3d.core import LVector3
 import sys
 import os
 
-from terrain import generateTerrainImage, generateTerrainGeom
+from terrain import LightworldTerrain
 
 # Function to put instructions on the screen.
 def addInstructions(pos, msg):
@@ -60,7 +60,8 @@ class LightworldBasic(ShowBase):
 
         # Terrain Map
         terrainSize = 128
-        terrainMap = generateTerrainGeom(terrainSize)
+        terrain = LightworldTerrain(terrainSize) 
+        terrainMap = terrain.generateTerrainGeom()
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMap)
         map = render.attachNewNode(snode)
@@ -72,7 +73,8 @@ class LightworldBasic(ShowBase):
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
         self.avatar.setScale(0.25)
-        self.avatar.setPos(0,0,1.5)
+        self.avatar.setPos(0,0,terrain.getHeightAtPos(0,0)+1)
+        self.avatar.lookAt(0,-1,1)
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
@@ -82,7 +84,7 @@ class LightworldBasic(ShowBase):
 
         # Set up the camera
         self.disableMouse()
-        self.camera.setPos(self.avatar.getX(), self.avatar.getY()-10, self.avatar.getZ()+2)
+        self.camera.setPos(self.avatar.getX(), self.avatar.getY()-3, self.avatar.getZ()+0.5)
         self.camera.lookAt(self.avatar.getX(), self.avatar.getY(), self.avatar.getZ())
 
         # We will detect the height of the terrain by creating a collision
