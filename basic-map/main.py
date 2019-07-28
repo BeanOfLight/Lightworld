@@ -28,6 +28,7 @@ import sys
 import os
 
 from terrain import LightworldTerrain
+from avatar import LightworldAvatarControler
 
 # Function to put instructions on the screen.
 def addInstructions(pos, msg):
@@ -70,11 +71,15 @@ class LightworldBasic(ShowBase):
         map.setTexture(testTexture)
 
         # Create the avatar
+        self.avatarControler = LightworldAvatarControler()
+        self.avatarControler.curPos = LVector3(0,0,terrain.getHeightAtPos(0,0)+1)
+        self.avatarControler.curMoveDir = LVector3(0,1,0)
+        self.avatarControler.curLookDir = LVector3(0,1,0)
+
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
         self.avatar.setScale(0.25)
-        self.avatar.setPos(0,0,terrain.getHeightAtPos(0,0)+1)
-        self.avatar.lookAt(0,1,1)
+        self.avatar.setPos(self.avatarControler.curPos)
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
@@ -86,8 +91,8 @@ class LightworldBasic(ShowBase):
 
         # Set up the camera
         self.disableMouse()
-        self.camera.setPos(self.avatar.getX(), self.avatar.getY()-3, self.avatar.getZ()+0.5)
-        self.camera.lookAt(self.avatar.getX(), self.avatar.getY(), self.avatar.getZ())
+        self.camera.setPos(self.avatarControler.getCameraPos())
+        self.camera.lookAt(self.avatarControler.getCameraLookAt())
 
         # We will detect the height of the terrain by creating a collision
         # ray and casting it downward toward the terrain.  One ray will
@@ -125,28 +130,16 @@ class LightworldBasic(ShowBase):
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
 
-    moveTriggered = False
-    moving = False
-    moveTarget = LVector3(0,0,0)
     
     def moveForward(self):
-        if(self.moving == False):
-            self.moveTriggered = True
+        self.avatarControler.triggerMoveForward()
 
-    def move(self, task):
-        if(self.moveTriggered == True):
-            self.moving = True
-            self.moveTriggered = False
-            self.moveTarget = self.avatar.getPos() + LVector3(0,2,0)
+    def move(self, task):       
+        if(self.avatarControler.moving == True):
+            self.avatarControler.moveByDistance(0.1)
+            self.avatar.setPos(self.avatarControler.curPos)
+            self.camera.setPos(self.avatarControler.getCameraPos())
 
-        if(self.moving == True):
-            self.avatar.setY(self.avatar.getY()+0.05)
-            if(self.avatar.getY() >= self.moveTarget.getY()):
-                self.moving = False
-        
-        if(self.avatar.getY()-self.camera.getY() > 3):
-            self.camera.setY(self.camera.getY()+0.05)
-        
         return task.cont
 
 demo = LightworldBasic()
