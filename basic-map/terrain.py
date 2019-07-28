@@ -36,68 +36,174 @@ def generateTerrainGeom(size):
     vdata = GeomVertexData('square', format, Geom.UHDynamic)
     vertex = GeomVertexWriter(vdata, 'vertex')
     normal = GeomVertexWriter(vdata, 'normal')
-    color = GeomVertexWriter(vdata, 'color')
     texcoord = GeomVertexWriter(vdata, 'texcoord')
     tris = GeomTriangles(Geom.UHDynamic)
 
-    # Top Plane
-    vertex.add_data3(-1,-1, 1)
-    vertex.add_data3( 1,-1, 1)
-    vertex.add_data3( 1, 1, 1)
-    vertex.add_data3(-1, 1, 1)
-    for x in range(4):
-        color.addData4f(0.0, 0.8, 0.4, 1.0)
-        normal.addData3(0,0,1)
-    tris.addVertices(0, 1, 2)
-    tris.addVertices(0, 2, 3)
+    vIndex = 0
 
-    #Side Planes
-    vertex.add_data3(1,-1,-1)
-    vertex.add_data3(1, 1,-1)
-    vertex.add_data3(1, 1, 1)
-    vertex.add_data3(1,-1, 1)
-
-    vertex.add_data3( 1, 1,-1)
-    vertex.add_data3(-1, 1,-1)
-    vertex.add_data3(-1, 1, 1)
-    vertex.add_data3( 1, 1, 1)
-
-    vertex.add_data3(-1, 1,-1)
-    vertex.add_data3(-1,-1,-1)
-    vertex.add_data3(-1,-1, 1)
-    vertex.add_data3(-1, 1, 1)
-
-    vertex.add_data3(-1,-1,-1)
-    vertex.add_data3( 1,-1,-1)
-    vertex.add_data3( 1,-1, 1)
-    vertex.add_data3(-1,-1, 1)
-
-    for x in range(4):
-        normal.addData3(1,0,0)
-    for x in range(4):
-        normal.addData3(0,1,0)
-    for x in range(4):
-        normal.addData3(-1,0,0)
-    for x in range(4):
-        normal.addData3(0,-1,0)
-
-    for x in range (4):
-        tris.addVertices(4*(x+1), 4*(x+1)+1, 4*(x+1)+2)
-        tris.addVertices(4*(x+1), 4*(x+1)+2, 4*(x+1)+3)
-
-    for x in range(16):
-        color.addData4f(0.6, 0.4, 0.2, 1.0)
-
-    for x in range(1):
+    def addTexRock():
         texcoord.addData2f(0.0, 0.0)
         texcoord.addData2f(0.5, 0.0)
-        texcoord.addData2f(0.5, 1.0)
-        texcoord.addData2f(0.0, 1.0)
-    for x in range(4):
+        texcoord.addData2f(0.5, 0.5)
+        texcoord.addData2f(0.0, 0.5)
+    def addTexWater():
         texcoord.addData2f(0.5, 0.0)
         texcoord.addData2f(1.0, 0.0)
+        texcoord.addData2f(1.0, 0.5)
+        texcoord.addData2f(0.5, 0.5)
+    def addTexGrass():
+        texcoord.addData2f(0.0, 0.5)
+        texcoord.addData2f(0.5, 0.5)
+        texcoord.addData2f(0.5, 1.0)
+        texcoord.addData2f(0.0, 1.0)
+    def addTexSand():
+        texcoord.addData2f(0.5, 0.5)
+        texcoord.addData2f(1.0, 0.5)
         texcoord.addData2f(1.0, 1.0)
         texcoord.addData2f(0.5, 1.0)
+
+    def addTexFloor(altitude):
+        if(altitude<0):
+            addTexWater()
+        elif(altitude<0.5):
+            addTexSand()
+        elif(altitude<5):
+            addTexGrass()
+        else:
+            addTexRock()
+
+    def addTexSkirt(altitude, wallHeight):
+        if(altitude<=0):
+            addTexWater()
+        elif(altitude<0.5):
+            addTexSand()
+        elif(altitude<5) and (wallHeight<1):
+            addTexGrass()
+        else:
+            addTexRock()
+
+    def addSquareVerts(vStart):
+        tris.addVertices(vStart, vStart+1, vStart+2)
+        tris.addVertices(vStart, vStart+2, vStart+3)
+        return vStart + 4
+
+    def addFloorSquare(x, y, z, vStart):
+        vertex.add_data3(x-1,y-1, z)
+        vertex.add_data3(x+1,y-1, z)
+        vertex.add_data3(x+1,y+1, z)
+        vertex.add_data3(x-1,y+1, z)
+        for x in range(4):
+            normal.addData3(0,0,1)
+        return addSquareVerts(vStart)
+
+    def addSkirtSquareXP(x, y, z, vStart):
+        vertex.add_data3(x+1,y-1,z-0.5)
+        vertex.add_data3(x+1,y+1,z-0.5)
+        vertex.add_data3(x+1,y+1,z)
+        vertex.add_data3(x+1,y-1,z)
+        for x in range(4):
+            normal.addData3(1,0,0)
+        return addSquareVerts(vStart)
+
+    def addSkirtSquareYP(x, y, z, vStart):
+        vertex.add_data3(x+1,y+1,z-0.5)
+        vertex.add_data3(x-1,y+1,z-0.5)
+        vertex.add_data3(x-1,y+1,z)
+        vertex.add_data3(x+1,y+1,z)
+        for x in range(4):
+            normal.addData3(0,1,0)
+        return addSquareVerts(vStart)
+    
+    def addSkirtSquareXN(x, y, z, vStart):
+        vertex.add_data3(x-1,y+1,z-0.5)
+        vertex.add_data3(x-1,y-1,z-0.5)
+        vertex.add_data3(x-1,y-1,z)
+        vertex.add_data3(x-1,y+1,z)
+        for x in range(4):
+            normal.addData3(-1,0,0)
+        return addSquareVerts(vStart)
+    
+    def addSkirtSquareYN(x, y, z, vStart):
+        vertex.add_data3(x-1,y-1,z-0.5)
+        vertex.add_data3(x+1,y-1,z-0.5)
+        vertex.add_data3(x+1,y-1,z)
+        vertex.add_data3(x-1,y-1,z)
+        for x in range(4):
+            normal.addData3(0,-1,0)
+        return addSquareVerts(vStart)
+
+    def getHeight(i,j, terrainHeigh):
+        h = round((terrainHeight.getGray(i,j)-0.3)*20)/2
+        #if h<0:
+        #    h = 0
+        return h
+
+    terrainHeight = generateTerrainImage(size)
+
+    for i in range(size):
+        for j in range(size):
+            # add floor
+            x = 2*i-size
+            y = 2*j-size
+            z = getHeight(i,j, terrainHeight)
+            vIndex = addFloorSquare(x, y, z, vIndex)
+            addTexFloor(z)
+
+            #yp side
+            bottom = -5
+            if j != size-1:
+                bottom = getHeight(i,j+1, terrainHeight)
+            zSide = z
+            wallHeight = zSide-bottom
+            while zSide > bottom:
+                vIndex = addSkirtSquareYP(x, y, zSide, vIndex)  
+                if j == size-1:
+                    addTexSand()
+                else:
+                    addTexSkirt(zSide, wallHeight)
+                zSide = zSide - 0.5
+
+            #yn side
+            bottom = -5
+            if j != 0:
+                bottom = getHeight(i,j-1, terrainHeight)               
+            zSide = z
+            wallHeight = zSide-bottom
+            while zSide > bottom:
+                vIndex = addSkirtSquareYN(x, y, zSide, vIndex)  
+                if j == 0:
+                    addTexSand()
+                else:
+                    addTexSkirt(zSide, wallHeight)
+                zSide = zSide - 0.5
+
+            #xp side
+            bottom = -5
+            if i != size-1:
+                bottom = getHeight(i+1,j, terrainHeight)               
+            zSide = z
+            wallHeight = zSide-bottom
+            while zSide > bottom:
+                vIndex = addSkirtSquareXP(x, y, zSide, vIndex) 
+                if i == size-1:
+                    addTexSand()
+                else:
+                    addTexSkirt(zSide, wallHeight)
+                zSide = zSide - 0.5
+
+            #xn side
+            bottom = -5
+            wallHeight = zSide-bottom
+            if i != 0:
+                bottom = getHeight(i-1,j, terrainHeight)               
+            zSide = z
+            while zSide > bottom:
+                vIndex = addSkirtSquareXN(x, y, zSide, vIndex)
+                if i == 0:
+                    addTexSand()
+                else:
+                    addTexSkirt(zSide, wallHeight)
+                zSide = zSide - 0.5
 
     terrainCube = Geom(vdata)
     terrainCube.addPrimitive(tris)

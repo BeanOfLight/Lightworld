@@ -28,7 +28,7 @@ from terrain import generateTerrainImage, generateTerrainGeom
 
 base = ShowBase()
 base.disableMouse()
-base.camera.setPos(40, -100, 20)
+base.camera.setPos(40, -160, 40)
 base.camera.lookAt(0, 0, 0)
 #base.camera.setPos(0, 0, 1.5)
 #base.camera.lookAt(0, 1, 1.4)
@@ -37,26 +37,14 @@ title = OnscreenText(text="Create a Basic Map",
                      style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
                      parent=base.a2dBottomRight, align=TextNode.ARight)
 
-testTexture = loader.loadTexture("grass.png")
-terrainSize = 64
-x0 = terrainSize / 2
-y0 = terrainSize / 2
-terrainHeight = generateTerrainImage(terrainSize)
-#terrainHeight.write("/e/toto.png")
+terrainSize = 256
 terrainCube = generateTerrainGeom(terrainSize)
-
-for i in range(terrainSize):
-    for j in range(terrainSize):
-        snode = GeomNode('terrainPatch')
-        snode.addGeom(terrainCube)
-        cube = render.attachNewNode(snode)
-        cube.setTwoSided(True)
-        cube.setTexture(testTexture)
-        x = 2*i-terrainSize
-        y = 2*j-terrainSize
-        #z = round(max([4-((x-x0)**2+(y-y0)**2) / 50,0]))
-        z = round(terrainHeight.getGray(i,j)*10)/2
-        cube.setPos(x, y, z)
+snode = GeomNode('terrainPatch')
+snode.addGeom(terrainCube)
+cube = render.attachNewNode(snode)
+cube.setTwoSided(True)
+testTexture = loader.loadTexture("terrainTex.png")
+cube.setTexture(testTexture)
 
 alight = AmbientLight('alight')
 alight.setColor((0.4, 0.4, 0.4, 1))
