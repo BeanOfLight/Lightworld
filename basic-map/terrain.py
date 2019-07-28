@@ -16,16 +16,20 @@ import math
 def generateTerrainImage(size):
     #Perlin Noise Base
     terrainImage = PNMImage(size, size, 1)
-    stackedNoise = StackedPerlinNoise2(0.5, 0.5, 8, 2, 0.5, size, 0)
+    scale = 0.5 * 64 / size
+    stackedNoise = StackedPerlinNoise2(scale, scale, 8, 2, 0.5, size, 0)
     terrainImage.perlinNoiseFill(stackedNoise)
 
     #Make it look a bit more natural
-    #for i in range(size):
-    #    for j in range(size):
-    #        g = terrainImage.getGray(i,j)
-    #        # g = (abs(g-0.5)*2)**2
-    #        # g = ((g-0.5)*2)
-    #        terrainImage.setGray(i,j,(g+1)/2)
+    for i in range(size):
+        for j in range(size):
+            g = terrainImage.getGray(i,j)
+            # make between -1 and 1, more land than water
+            g = (g-0.25)/0.75
+            # make mountain more spiky and plains more flat
+            if g>0:
+                g = g ** 2
+            terrainImage.setGray(i,j,(g+1)/2)
 
     return terrainImage
 
@@ -67,7 +71,7 @@ def generateTerrainGeom(size):
             addTexWater()
         elif(altitude<0.5):
             addTexSand()
-        elif(altitude<5):
+        elif(altitude<4):
             addTexGrass()
         else:
             addTexRock()
@@ -77,7 +81,7 @@ def generateTerrainGeom(size):
             addTexWater()
         elif(altitude<0.5):
             addTexSand()
-        elif(altitude<5) and (wallHeight<1):
+        elif(altitude<4) and (wallHeight<1):
             addTexGrass()
         else:
             addTexRock()
@@ -133,9 +137,7 @@ def generateTerrainGeom(size):
         return addSquareVerts(vStart)
 
     def getHeight(i,j, terrainHeigh):
-        h = round((terrainHeight.getGray(i,j)-0.3)*20)/2
-        #if h<0:
-        #    h = 0
+        h = round((terrainHeight.getGray(i,j)-0.5)*20)/2
         return h
 
     terrainHeight = generateTerrainImage(size)

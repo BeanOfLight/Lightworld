@@ -18,7 +18,7 @@ from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import Texture, GeomNode
 from panda3d.core import PerspectiveLens
 from panda3d.core import CardMaker
-from panda3d.core import Light, Spotlight, AmbientLight
+from panda3d.core import Light, DirectionalLight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
 import sys
@@ -28,16 +28,16 @@ from terrain import generateTerrainImage, generateTerrainGeom
 
 base = ShowBase()
 base.disableMouse()
-base.camera.setPos(40, -160, 40)
+
+terrainSize = 128
+
+base.camera.setPos(terrainSize/2, -1.7*terrainSize, terrainSize/4)
 base.camera.lookAt(0, 0, 0)
-#base.camera.setPos(0, 0, 1.5)
-#base.camera.lookAt(0, 1, 1.4)
 
 title = OnscreenText(text="Create a Basic Map",
                      style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
                      parent=base.a2dBottomRight, align=TextNode.ARight)
 
-terrainSize = 256
 terrainCube = generateTerrainGeom(terrainSize)
 snode = GeomNode('terrainPatch')
 snode.addGeom(terrainCube)
@@ -51,13 +51,10 @@ alight.setColor((0.4, 0.4, 0.4, 1))
 alnp = render.attachNewNode(alight)
 render.setLight(alnp)
 
-slight = Spotlight('slight')
-slight.setColor((1, 1, 1, 1))
-lens = PerspectiveLens()
-slight.setLens(lens)
-slnp = render.attachNewNode(slight)
-render.setLight(slnp)
-slnp.setPos(cube, -20, -40, 80)
-slnp.lookAt(0, 0, 0)
+dlight = DirectionalLight('dlight')
+dlight.setColor((0.8, 0.7, 0.6, 1))
+dlnp = render.attachNewNode(dlight)
+render.setLight(dlnp)
+dlnp.setHpr(0,-60,0)
 
 base.run()
