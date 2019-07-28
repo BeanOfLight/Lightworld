@@ -15,6 +15,9 @@ from direct.interval.IntervalGlobal import *
 from panda3d.core import lookAt
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
+from panda3d.core import CollisionTraverser, CollisionNode
+from panda3d.core import CollisionHandlerQueue, CollisionRay
+from panda3d.core import CollideMask
 from panda3d.core import Texture, GeomNode
 from panda3d.core import PerspectiveLens
 from panda3d.core import CardMaker
@@ -26,35 +29,97 @@ import os
 
 from terrain import generateTerrainImage, generateTerrainGeom
 
-base = ShowBase()
-base.disableMouse()
+# Function to put instructions on the screen.
+def addInstructions(pos, msg):
+    return OnscreenText(text=msg, style=1, fg=(1, 1, 1, 1), scale=.05,
+                        shadow=(0, 0, 0, 1), parent=base.a2dTopLeft,
+                        pos=(0.08, -pos - 0.04), align=TextNode.ALeft)
 
-terrainSize = 128
+# Function to put title on the screen.
+def addTitle(text):
+    return OnscreenText(text=text, style=1, fg=(1, 1, 1, 1), scale=.07,
+                        parent=base.a2dBottomRight, align=TextNode.ARight,
+                        pos=(-0.1, 0.09), shadow=(0, 0, 0, 1))
 
-base.camera.setPos(terrainSize/2, -1.7*terrainSize, terrainSize/4)
-base.camera.lookAt(0, 0, 0)
+# Game Class
+class LightworldBasic(ShowBase):
+    def __init__(self):
+        # Set up the window, camera, etc.
+        ShowBase.__init__(self)
 
-title = OnscreenText(text="Create a Basic Map",
-                     style=1, fg=(1, 1, 1, 1), pos=(-0.1, 0.1), scale=.07,
-                     parent=base.a2dBottomRight, align=TextNode.ARight)
+        # Set the background color to blue
+        self.win.setClearColor((0.4, 0.7, 1.0, 1))
 
-terrainCube = generateTerrainGeom(terrainSize)
-snode = GeomNode('terrainPatch')
-snode.addGeom(terrainCube)
-cube = render.attachNewNode(snode)
-cube.setTwoSided(True)
-testTexture = loader.loadTexture("terrainTex.png")
-cube.setTexture(testTexture)
+        # Post the instructions
+        self.title = addTitle(
+            "Lightworld: Explore the map")
+        self.inst1 = addInstructions(0.06, "[ESC]: Quit")
+        self.inst2 = addInstructions(0.12, "[Left Arrow]: Rotate Left")
+        self.inst3 = addInstructions(0.18, "[Right Arrow]: Rotate Right")
+        self.inst4 = addInstructions(0.24, "[Up Arrow]: Move Forward")
 
-alight = AmbientLight('alight')
-alight.setColor((0.4, 0.4, 0.4, 1))
-alnp = render.attachNewNode(alight)
-render.setLight(alnp)
+        # Terrain Map
+        terrainSize = 128
+        terrainMap = generateTerrainGeom(terrainSize)
+        snode = GeomNode('terrainPatch')
+        snode.addGeom(terrainMap)
+        map = render.attachNewNode(snode)
+        map.setTwoSided(True)
+        testTexture = loader.loadTexture("terrainTex.png")
+        map.setTexture(testTexture)
 
-dlight = DirectionalLight('dlight')
-dlight.setColor((0.8, 0.7, 0.6, 1))
-dlnp = render.attachNewNode(dlight)
-render.setLight(dlnp)
-dlnp.setHpr(0,-60,0)
+        # Create the avatar
+        self.avatar = loader.loadModel("models/smiley")
+        self.avatar.reparentTo(render)
+        self.avatar.setScale(0.25)
+        self.avatar.setPos(0,0,1.5)
 
-base.run()
+        # Accept the control keys for movement and rotation
+        self.accept("escape", sys.exit)
+     #   self.accept("arrow_left", self.turnLeft)
+     #   self.accept("arrow_right", self.turnRight)
+     #   self.accept("arrow_up", self.moveForward)
+
+        # Set up the camera
+        self.disableMouse()
+        self.camera.setPos(self.avatar.getX(), self.avatar.getY()-10, self.avatar.getZ()+2)
+        self.camera.lookAt(self.avatar.getX(), self.avatar.getY(), self.avatar.getZ())
+
+        # We will detect the height of the terrain by creating a collision
+        # ray and casting it downward toward the terrain.  One ray will
+        # start above ralph's head, and the other will start above the camera.
+        # A ray may hit the terrain, or it may hit a rock or a tree.  If it
+        # hits the terrain, we can detect the height.  If it hits anything
+        # else, we rule that the move is illegal.
+        self.cTrav = CollisionTraverser()
+        self.avatarGroundRay = CollisionRay()
+        self.avatarGroundRay.setOrigin(0, 0, 9)
+        self.avatarGroundRay.setDirection(0, 0, -1)
+        self.avatarGroundCol = CollisionNode('ralphRay')
+        self.avatarGroundCol.addSolid(self.avatarGroundRay)
+        self.avatarGroundCol.setFromCollideMask(CollideMask.bit(0))
+        self.avatarGroundCol.setIntoCollideMask(CollideMask.allOff())
+        self.avatarGroundColNp = self.avatar.attachNewNode(self.avatarGroundCol)
+        self.avatarGroundHandler = CollisionHandlerQueue()
+        self.cTrav.addCollider(self.avatarGroundColNp, self.avatarGroundHandler)
+
+        # Uncomment this line to see the collision rays
+        self.avatarGroundColNp.show()
+
+        # Uncomment this line to show a visual representation of the
+        # collisions occuring
+        self.cTrav.showCollisions(render)
+
+        # Create some lighting
+        alight = AmbientLight('alight')
+        alight.setColor((0.4, 0.4, 0.4, 1))
+        alnp = render.attachNewNode(alight)
+        render.setLight(alnp)
+        dlight = DirectionalLight('dlight')
+        dlight.setColor((0.8, 0.7, 0.6, 1))
+        dlnp = render.attachNewNode(dlight)
+        render.setLight(dlnp)
+        dlnp.setHpr(0,-60,0)
+
+demo = LightworldBasic()
+demo.run()
