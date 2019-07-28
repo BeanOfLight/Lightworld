@@ -203,10 +203,10 @@ class LightworldTerrain:
 
                 #xn side
                 bottom = -5
-                wallHeight = zSide-bottom
                 if i != 0:
                     bottom = self.__getHeight(i-1,j)               
                 zSide = z
+                wallHeight = zSide-bottom
                 while zSide > bottom:
                     vIndex = addSkirtSquareXN(x, y, zSide, vIndex)
                     if i == 0:

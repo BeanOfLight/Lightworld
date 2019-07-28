@@ -60,9 +60,9 @@ class LightworldBasic(ShowBase):
         self.inst4 = addInstructions(0.24, "[Up Arrow]: Move Forward")
 
         # Terrain Map
-        terrainSize = 128
-        terrain = LightworldTerrain(terrainSize) 
-        terrainMap = terrain.generateTerrainGeom()
+        terrainSize = 512
+        self.terrain = LightworldTerrain(terrainSize) 
+        terrainMap = self.terrain.generateTerrainGeom()
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMap)
         map = render.attachNewNode(snode)
@@ -72,52 +72,29 @@ class LightworldBasic(ShowBase):
 
         # Create the avatar
         self.avatarControler = LightworldAvatarControler()
-        self.avatarControler.curPos = LVector3(0,0,terrain.getHeightAtPos(0,0)+1)
+        self.avatarControler.curPos = LVector3(0,0,self.terrain.getHeightAtPos(0,0)+0.5)
         self.avatarControler.curMoveDir = LVector3(0,1,0)
-        self.avatarControler.curLookDir = LVector3(0,1,0)
+        self.avatarControler.curCamPos = self.avatarControler.curPos - self.avatarControler.curMoveDir * 1.9
 
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
-        self.avatar.setScale(0.25)
+        self.avatar.setScale(0.01)
         self.avatar.setPos(self.avatarControler.curPos)
+        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+        self.avatar.hide()
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
-     #   self.accept("arrow_left", self.turnLeft)
-     #   self.accept("arrow_right", self.turnRight)
+        self.accept("arrow_left", self.turnLeft)
+        self.accept("arrow_right", self.turnRight)
         self.accept("arrow_up", self.moveForward)
 
         taskMgr.add(self.move, "moveTask")
 
         # Set up the camera
         self.disableMouse()
-        self.camera.setPos(self.avatarControler.getCameraPos())
-        self.camera.lookAt(self.avatarControler.getCameraLookAt())
-
-        # We will detect the height of the terrain by creating a collision
-        # ray and casting it downward toward the terrain.  One ray will
-        # start above ralph's head, and the other will start above the camera.
-        # A ray may hit the terrain, or it may hit a rock or a tree.  If it
-        # hits the terrain, we can detect the height.  If it hits anything
-        # else, we rule that the move is illegal.
-        self.cTrav = CollisionTraverser()
-        self.avatarGroundRay = CollisionRay()
-        self.avatarGroundRay.setOrigin(0, 0, 9)
-        self.avatarGroundRay.setDirection(0, 0, -1)
-        self.avatarGroundCol = CollisionNode('avatarRay')
-        self.avatarGroundCol.addSolid(self.avatarGroundRay)
-        self.avatarGroundCol.setFromCollideMask(CollideMask.bit(0))
-        self.avatarGroundCol.setIntoCollideMask(CollideMask.allOff())
-        self.avatarGroundColNp = self.avatar.attachNewNode(self.avatarGroundCol)
-        self.avatarGroundHandler = CollisionHandlerQueue()
-        self.cTrav.addCollider(self.avatarGroundColNp, self.avatarGroundHandler)
-
-        # Uncomment this line to see the collision rays
-        self.avatarGroundColNp.show()
-
-        # Uncomment this line to show a visual representation of the
-        # collisions occuring
-        self.cTrav.showCollisions(render)
+        self.camera.setPos(self.avatarControler.curCamPos)
+        self.camera.lookAt(self.avatarControler.curPos)
 
         # Create some lighting
         alight = AmbientLight('alight')
@@ -129,16 +106,30 @@ class LightworldBasic(ShowBase):
         dlnp = render.attachNewNode(dlight)
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
-
     
     def moveForward(self):
-        self.avatarControler.triggerMoveForward()
+        target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
+        target.setZ(self.terrain.getHeightAtPos(target.getX(),target.getY())+0.5)
+        self.avatarControler.triggerMoveForward(target)
+
+    def turnLeft(self):
+        self.avatarControler.triggerTurnLeft()
+    
+    def turnRight(self):
+        self.avatarControler.triggerTurnRight()
 
     def move(self, task):       
         if(self.avatarControler.moving == True):
             self.avatarControler.moveByDistance(0.1)
             self.avatar.setPos(self.avatarControler.curPos)
-            self.camera.setPos(self.avatarControler.getCameraPos())
+            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+            self.camera.setPos(self.avatarControler.curCamPos)
+            self.camera.lookAt(self.avatarControler.curPos)
+        elif(self.avatarControler.turning == True):
+            self.avatarControler.turnByDistance(0.2)
+            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+            self.camera.setPos(self.avatarControler.curCamPos)
+            self.camera.lookAt(self.avatarControler.curPos)
 
         return task.cont
 
