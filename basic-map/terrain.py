@@ -109,7 +109,8 @@ class LightworldTerrain:
             vNext = addTriangleFan(vStart, 4)
             return vNext
 
-        def addFloorSquare(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
+        def addFloorSquare(
+            x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x-xnOffset,y-ynOffset, z)
             vertex.add_data3(x+xpOffset,y-ynOffset, z)
             vertex.add_data3(x+xpOffset,y+ypOffset, z)
@@ -117,6 +118,64 @@ class LightworldTerrain:
             for x in range(4):
                 normal.addData3(0,0,1)
             return addSquareVerts(vStart)
+
+        def addFloorTile(
+            x, y, z, 
+            cellRadius, offsetRadius,
+            xnIndent, xpIndent, ynIndent, ypIndent, 
+            xnynIndent, xnypIndent, xpynIndent, xpypIndent, 
+            vStart):
+            
+            # Compute side offsets
+            xnOffset = offsetRadius if xnIndent else cellRadius
+            xpOffset = offsetRadius if xpIndent else cellRadius
+            ynOffset = offsetRadius if ynIndent else cellRadius
+            ypOffset = offsetRadius if ypIndent else cellRadius
+
+            numVerts = 0
+
+            # xn yn corner
+            if(xnynIndent):
+                vertex.add_data3(x-cellRadius, y-offsetRadius, z)
+                vertex.add_data3(x-offsetRadius, y-cellRadius, z)
+                numVerts += 2
+            else:
+                vertex.add_data3(x-xnOffset,y-ynOffset, z)
+                numVerts += 1
+
+            # xp yn corner
+            if(xpynIndent):
+                vertex.add_data3(x+offsetRadius, y-cellRadius, z)
+                vertex.add_data3(x+cellRadius, y-offsetRadius, z)
+                numVerts += 2
+            else:
+                vertex.add_data3(x+xpOffset,y-ynOffset, z)
+                numVerts += 1
+
+            # xp yp corner
+            numVerts = 0
+            if(xpypIndent):
+                vertex.add_data3(x+cellRadius, y+offsetRadius, z)
+                vertex.add_data3(x+offsetRadius, y+cellRadius, z)
+                numVerts += 2
+            else:
+                vertex.add_data3(x+xpOffset,y+ynOffset, z)
+                numVerts += 1
+
+            # xn yp corner
+            numVerts = 0
+            if(xnypIndent):
+                vertex.add_data3(x-offsetRadius, y+cellRadius, z)
+                vertex.add_data3(x-cellRadius, y+offsetRadius, z)
+                numVerts += 2
+            else:
+                vertex.add_data3(x-xnOffset,y+ynOffset, z)
+                numVerts += 1
+
+            for x in range(numVerts):
+                normal.addData3(0,0,1)
+            return addTriangleFan(vStart, numVerts)
+
 
         def addSkirtSquareXN(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x-1,y+1,z-0.5)
@@ -162,8 +221,6 @@ class LightworldTerrain:
                 z = self.__getHeight(i,j)
 
                 # Compute attributes of the cell for 4 straight directions
-
-
                 if(i==0):
                     xnBorder = True 
                     xnBottom = -5
@@ -221,41 +278,32 @@ class LightworldTerrain:
                     xpypBorder = False
                     xpypBottom = self.__getHeight(i+1,j+1)
 
-                xnOffset = 1
-                xpOffset = 1
-                ynOffset = 1
-                ypOffset = 1
+                xnIndent = (xnBorder == False and xnBottom < z)
+                xpIndent = (xpBorder == False and xpBottom < z)
+                ynIndent = (ynBorder == False and ynBottom < z)
+                ypIndent = (ypBorder == False and ypBottom < z)
 
-                if(xnBorder == False and xnBottom < z):
-                    xnOffset = 0.5
-                if(xpBorder == False and xpBottom < z):
-                    xpOffset = 0.5
-                if(ynBorder == False and ynBottom < z):
-                    ynOffset = 0.5
-                if(ypBorder == False and ypBottom < z):
-                    ypOffset = 0.5
+                xnynIndent = (xnBorder == False and ynBorder == False and xnBottom == z and ynBottom == z and xnynBottom < z)
+                xnypIndent = (xnBorder == False and ypBorder == False and xnBottom == z and ypBottom == z and xnypBottom < z)
+                xpynIndent = (xpBorder == False and ynBorder == False and xpBottom == z and ynBottom == z and xpynBottom < z)
+                xpypIndent = (xpBorder == False and ypBorder == False and xpBottom == z and ypBottom == z and xpypBottom < z)
 
-                vIndex = addFloorSquare(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
+                
+                vIndex = addFloorTile(x, y, z, 1, 0.5,
+                        xnIndent, xpIndent, ynIndent, ypIndent, 
+                        xnynIndent, xnypIndent, xpynIndent, xpypIndent, 
+                        vIndex)
+
                 addTexFloor(z)
 
-                #yp side
+                #xn side
                 zSide = z
-                while zSide > ypBottom:
-                    vIndex = addSkirtSquareYP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
-                    if ypBorder == True:
+                while zSide > xnBottom:
+                    vIndex = addSkirtSquareXN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
+                    if i == 0:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, z-ypBottom)
-                    zSide = zSide - 0.5
-
-                #yn side
-                zSide = z
-                while zSide > ynBottom:
-                    vIndex = addSkirtSquareYN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
-                    if ynBorder:
-                        addTexSand()
-                    else:
-                        addTexSkirt(zSide, z-ynBottom)
+                        addTexSkirt(zSide, z-xnBottom)
                     zSide = zSide - 0.5
 
                 #xp side
@@ -268,14 +316,24 @@ class LightworldTerrain:
                         addTexSkirt(zSide, z-xpBottom)
                     zSide = zSide - 0.5
 
-                #xn side
+                #yn side
                 zSide = z
-                while zSide > xnBottom:
-                    vIndex = addSkirtSquareXN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
-                    if i == 0:
+                while zSide > ynBottom:
+                    vIndex = addSkirtSquareYN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
+                    if ynBorder:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, z-xnBottom)
+                        addTexSkirt(zSide, z-ynBottom)
+                    zSide = zSide - 0.5
+
+                #yp side
+                zSide = z
+                while zSide > ypBottom:
+                    vIndex = addSkirtSquareYP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
+                    if ypBorder == True:
+                        addTexSand()
+                    else:
+                        addTexSkirt(zSide, z-ypBottom)
                     zSide = zSide - 0.5
 
         terrainCube = Geom(vdata)
