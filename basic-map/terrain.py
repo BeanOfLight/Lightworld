@@ -105,47 +105,47 @@ class LightworldTerrain:
             tris.addVertices(vStart, vStart+2, vStart+3)
             return vStart + 4
 
-        def addFloorSquare(x, y, z, vStart):
-            vertex.add_data3(x-1,y-1, z)
-            vertex.add_data3(x+1,y-1, z)
-            vertex.add_data3(x+1,y+1, z)
-            vertex.add_data3(x-1,y+1, z)
+        def addFloorSquare(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
+            vertex.add_data3(x-xnOffset,y-ynOffset, z)
+            vertex.add_data3(x+xpOffset,y-ynOffset, z)
+            vertex.add_data3(x+xpOffset,y+ypOffset, z)
+            vertex.add_data3(x-xnOffset,y+ypOffset, z)
             for x in range(4):
                 normal.addData3(0,0,1)
             return addSquareVerts(vStart)
 
-        def addSkirtSquareXP(x, y, z, vStart):
+        def addSkirtSquareXN(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
+            vertex.add_data3(x-1,y+1,z-0.5)
+            vertex.add_data3(x-1,y-1,z-0.5)
+            vertex.add_data3(x-xnOffset,y-ynOffset,z)
+            vertex.add_data3(x-xnOffset,y+ypOffset,z)
+            for x in range(4):
+                normal.addData3(-1,0,0)
+            return addSquareVerts(vStart)
+
+        def addSkirtSquareXP(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x+1,y-1,z-0.5)
             vertex.add_data3(x+1,y+1,z-0.5)
-            vertex.add_data3(x+1,y+1,z)
-            vertex.add_data3(x+1,y-1,z)
+            vertex.add_data3(x+xpOffset,y+ypOffset,z)
+            vertex.add_data3(x+xpOffset,y-ynOffset,z)
             for x in range(4):
                 normal.addData3(1,0,0)
             return addSquareVerts(vStart)
 
-        def addSkirtSquareYP(x, y, z, vStart):
+        def addSkirtSquareYP(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x+1,y+1,z-0.5)
             vertex.add_data3(x-1,y+1,z-0.5)
-            vertex.add_data3(x-1,y+1,z)
-            vertex.add_data3(x+1,y+1,z)
+            vertex.add_data3(x-xnOffset,y+ypOffset,z)
+            vertex.add_data3(x+xpOffset,y+ypOffset,z)
             for x in range(4):
                 normal.addData3(0,1,0)
             return addSquareVerts(vStart)
         
-        def addSkirtSquareXN(x, y, z, vStart):
-            vertex.add_data3(x-1,y+1,z-0.5)
-            vertex.add_data3(x-1,y-1,z-0.5)
-            vertex.add_data3(x-1,y-1,z)
-            vertex.add_data3(x-1,y+1,z)
-            for x in range(4):
-                normal.addData3(-1,0,0)
-            return addSquareVerts(vStart)
-        
-        def addSkirtSquareYN(x, y, z, vStart):
+        def addSkirtSquareYN(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x-1,y-1,z-0.5)
             vertex.add_data3(x+1,y-1,z-0.5)
-            vertex.add_data3(x+1,y-1,z)
-            vertex.add_data3(x-1,y-1,z)
+            vertex.add_data3(x+xpOffset,y-ynOffset,z)
+            vertex.add_data3(x-xnOffset,y-ynOffset,z)
             for x in range(4):
                 normal.addData3(0,-1,0)
             return addSquareVerts(vStart)
@@ -156,63 +156,122 @@ class LightworldTerrain:
                 x = 2*i-self.size
                 y = 2*j-self.size
                 z = self.__getHeight(i,j)
-                vIndex = addFloorSquare(x, y, z, vIndex)
+
+                # Compute attributes of the cell for 4 straight directions
+
+
+                if(i==0):
+                    xnBorder = True 
+                    xnBottom = -5
+                else: 
+                    xnBorder = False
+                    xnBottom = self.__getHeight(i-1,j)
+
+                if(i==self.size-1):
+                    xpBorder = True 
+                    xpBottom = -5
+                else: 
+                    xpBorder = False
+                    xpBottom = self.__getHeight(i+1,j)
+
+                if(j==0):
+                    ynBorder = True 
+                    ynBottom = -5
+                else: 
+                    ynBorder = False
+                    ynBottom = self.__getHeight(i,j-1) 
+
+                if(j==self.size-1):
+                    ypBorder = True 
+                    ypBottom = -5
+                else: 
+                    ypBorder = False
+                    ypBottom = self.__getHeight(i,j+1)                
+
+                # Compute attributes of the cell for 4 diagonal directions
+                if(i==0 or j==0):
+                    xnynBorder = True 
+                    xnynBottom = -5
+                else: 
+                    xnynBorder = False
+                    xnynBottom = self.__getHeight(i-1,j-1)
+                              
+                if(i==0 or j==self.size-1):
+                    xnypBorder = True 
+                    xnypBottom = -5
+                else: 
+                    xnypBorder = False
+                    xnypBottom = self.__getHeight(i-1,j+1)
+
+                if(i==self.size-1 or j==0):
+                    xpynBorder = True 
+                    xpynBottom = -5
+                else: 
+                    xpynBorder = False
+                    xpynBottom = self.__getHeight(i+1,j-1)
+                              
+                if(i==self.size-1 or j==self.size-1):
+                    xpypBorder = True 
+                    xpypBottom = -5
+                else: 
+                    xpypBorder = False
+                    xpypBottom = self.__getHeight(i+1,j+1)
+
+                xnOffset = 1
+                xpOffset = 1
+                ynOffset = 1
+                ypOffset = 1
+
+                if(xnBorder == False and xnBottom < z):
+                    xnOffset = 0.5
+                if(xpBorder == False and xpBottom < z):
+                    xpOffset = 0.5
+                if(ynBorder == False and ynBottom < z):
+                    ynOffset = 0.5
+                if(ypBorder == False and ypBottom < z):
+                    ypOffset = 0.5
+
+                vIndex = addFloorSquare(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
                 addTexFloor(z)
 
                 #yp side
-                bottom = -5
-                if j != self.size-1:
-                    bottom = self.__getHeight(i,j+1)
                 zSide = z
-                wallHeight = zSide-bottom
-                while zSide > bottom:
-                    vIndex = addSkirtSquareYP(x, y, zSide, vIndex)  
-                    if j == self.size-1:
+                while zSide > ypBottom:
+                    vIndex = addSkirtSquareYP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
+                    if ypBorder == True:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, wallHeight)
+                        addTexSkirt(zSide, z-ypBottom)
                     zSide = zSide - 0.5
 
                 #yn side
-                bottom = -5
-                if j != 0:
-                    bottom = self.__getHeight(i,j-1)               
                 zSide = z
-                wallHeight = zSide-bottom
-                while zSide > bottom:
-                    vIndex = addSkirtSquareYN(x, y, zSide, vIndex)  
-                    if j == 0:
+                while zSide > ynBottom:
+                    vIndex = addSkirtSquareYN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
+                    if ynBorder:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, wallHeight)
+                        addTexSkirt(zSide, z-ynBottom)
                     zSide = zSide - 0.5
 
                 #xp side
-                bottom = -5
-                if i != self.size-1:
-                    bottom = self.__getHeight(i+1,j)               
                 zSide = z
-                wallHeight = zSide-bottom
-                while zSide > bottom:
-                    vIndex = addSkirtSquareXP(x, y, zSide, vIndex) 
+                while zSide > xpBottom:
+                    vIndex = addSkirtSquareXP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex) 
                     if i == self.size-1:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, wallHeight)
+                        addTexSkirt(zSide, z-xpBottom)
                     zSide = zSide - 0.5
 
                 #xn side
-                bottom = -5
-                if i != 0:
-                    bottom = self.__getHeight(i-1,j)               
                 zSide = z
-                wallHeight = zSide-bottom
-                while zSide > bottom:
-                    vIndex = addSkirtSquareXN(x, y, zSide, vIndex)
+                while zSide > xnBottom:
+                    vIndex = addSkirtSquareXN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
                     if i == 0:
                         addTexSand()
                     else:
-                        addTexSkirt(zSide, wallHeight)
+                        addTexSkirt(zSide, z-xnBottom)
                     zSide = zSide - 0.5
 
         terrainCube = Geom(vdata)
