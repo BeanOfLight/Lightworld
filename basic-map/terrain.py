@@ -100,10 +100,14 @@ class LightworldTerrain:
             else:
                 addTexRock()
 
+        def addTriangleFan(vStart, numVerts):
+            for i in range (1, numVerts-1):
+                tris.addVertices(vStart, vStart+i, vStart+i+1)
+            return vStart + numVerts
+
         def addSquareVerts(vStart):
-            tris.addVertices(vStart, vStart+1, vStart+2)
-            tris.addVertices(vStart, vStart+2, vStart+3)
-            return vStart + 4
+            vNext = addTriangleFan(vStart, 4)
+            return vNext
 
         def addFloorSquare(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
             vertex.add_data3(x-xnOffset,y-ynOffset, z)
