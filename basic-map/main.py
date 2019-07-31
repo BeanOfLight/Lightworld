@@ -71,10 +71,10 @@ class LightworldBasic(ShowBase):
         map.setTexture(testTexture)
 
         # Create the avatar
-        self.avatarControler = LightworldAvatarControler()
-        self.avatarControler.curPos = LVector3(0,0,self.terrain.getHeightAtPos(0,0)+0.5)
-        self.avatarControler.curMoveDir = LVector3(0,1,0)
-        self.avatarControler.curCamPos = self.avatarControler.curPos - self.avatarControler.curMoveDir * 1.9
+        avatarHeight = 1
+        cameraDistance = 1
+        self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
+        self.avatarControler.setInitialPos(0,0,self.terrain.getHeightAtPos(0,0))
 
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
@@ -95,6 +95,8 @@ class LightworldBasic(ShowBase):
         self.disableMouse()
         self.camera.setPos(self.avatarControler.curCamPos)
         self.camera.lookAt(self.avatarControler.curPos)
+        self.camLens.setFocalLength(0.4)
+        self.camLens.setNear(0.1)
 
         # Create some lighting
         alight = AmbientLight('alight')
@@ -109,7 +111,7 @@ class LightworldBasic(ShowBase):
     
     def moveForward(self):
         target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
-        target.setZ(self.terrain.getHeightAtPos(target.getX(),target.getY())+0.5)
+        target.setZ(self.terrain.getHeightAtPos(target.getX(),target.getY()))
         self.avatarControler.triggerMoveForward(target)
 
     def turnLeft(self):

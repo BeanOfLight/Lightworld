@@ -10,11 +10,15 @@ from panda3d.core import LVector3
 
 class LightworldAvatarControler:
     
-    def __init__(self):
+    def __init__(self, height, camDist):
+        # Avatar and Cam Positions
+        self.avatarHeight = height
+        self.camDist = camDist
+        
         # Current Position
         self.curPos = LVector3(0,0,0)
         self.curMoveDir = LVector3(0,1,0)
-        self.curCamPos = self.curPos - self.curMoveDir * 1.9
+        self.curCamPos = self.curPos - self.curMoveDir * self.camDist
 
         # Target position for next move
         self.targetPos = self.curPos
@@ -26,11 +30,16 @@ class LightworldAvatarControler:
         self.moving = False
         self.turning = False
     
+    def setInitialPos(self, x, y, terrainHeight):
+         self.curPos = LVector3(x,y, terrainHeight + self.avatarHeight)
+         self.curCamPos = self.curPos - self.curMoveDir * self.camDist
+
     def triggerMoveForward(self, target):
         if(self.canReceiveCommand):
             self.moving = True
             self.canReceiveCommand = False
             self.targetPos = target
+            self.targetPos.setZ(self.targetPos.getZ()+self.avatarHeight)
     
     def moveByDistance(self, distanceToMove):
         if(self.moving):
@@ -43,7 +52,7 @@ class LightworldAvatarControler:
                 dir = (self.targetPos-self.curPos) * (1/distanceToTarget)
                 newPos = self.curPos + dir * distanceToMove
                 self.curPos = newPos
-            self.curCamPos = self.curPos - self.curMoveDir * 1.9
+            self.curCamPos = self.curPos - self.curMoveDir * self.camDist
 
     def triggerTurnLeft(self):
         if(self.canReceiveCommand):
@@ -51,7 +60,7 @@ class LightworldAvatarControler:
             self.canReceiveCommand = False
             self.targetMoveDir = LVector3(
                 -self.curMoveDir.getY(), self.curMoveDir.getX(), self.curMoveDir.getZ())
-            self.targetCamPos = self.curPos - self.targetMoveDir * 1.9
+            self.targetCamPos = self.curPos - self.targetMoveDir * self.camDist
 
     def triggerTurnRight(self):
         if(self.canReceiveCommand):
@@ -59,7 +68,7 @@ class LightworldAvatarControler:
             self.canReceiveCommand = False
             self.targetMoveDir = LVector3(
                 self.curMoveDir.getY(), -self.curMoveDir.getX(), self.curMoveDir.getZ())
-            self.targetCamPos = self.curPos - self.targetMoveDir * 1.9
+            self.targetCamPos = self.curPos - self.targetMoveDir * self.camDist
 
     def turnByDistance(self, distanceToMove):
         if(self.turning):
