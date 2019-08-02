@@ -13,6 +13,62 @@ import math
 # Tiled terrain map in 2x2m tiles
 # Height in discrete increments of 0.5m 
 
+class TerrainMesh:
+    def __init__(self):
+        self.format = GeomVertexFormat.getV3n3cpt2()
+        self.vdata = GeomVertexData('square', format, Geom.UHDynamic)
+        self.vertex = GeomVertexWriter(vdata, 'vertex')
+        self.texcoord = GeomVertexWriter(vdata, 'texcoord')
+        self.tris = GeomTriangles(Geom.UHDynamic)  
+        self.normal = GeomVertexWriter(vdata, 'normal')
+        self.numVerts = 0        
+
+class TerrainCellMesher:
+
+    class NeighbCell:
+        def _init__(self):
+            valid = False
+            heightStep = 0.5 #height increments resolution
+            heightDrop = 0 #difference in heigh increments (positive = lower)
+            needOffset = False
+
+    #  (7) xnyp   (6) yp   (5) xpyp
+    #           +--------+
+    #           |        |
+    #    (0) xn |        | (4) xp
+    #           |        |
+    #           +--------+
+    #  (1) xnyn   (2) yn   (3) xpyn
+
+    def __init__(self):
+        self.cellOutRadius = 1.0
+        self.cellInRadius = 0.5
+        self.mapHeightStep = 0.5
+        self.center = Vector3L(0.0,0.0,0.0)
+        self.sideCells = {
+            "xn"   : NeighbCell(),
+            "xnyn" : NeighbCell(),
+            "yn"   : NeighbCell(),
+            "xpyn" : NeighbCell(),
+            "xp"   : NeighbCell(),
+            "xpyp" : NeighbCell(),
+            "yp"   : NeighbCell(),
+            "xnyp" : NeighbCell()
+        }
+
+    def meshCell(self, mesher, i,j):
+        __meshCellFloor(self, mesher, i,j)
+        __meshCellSides(self, mesher, i,j)
+    
+    # Private
+    def __meshCellFloor(self, mesh, i,j):
+        # vertex pos coords
+        # vertex tex coords
+        # triangles
+        # normal
+
+    def __meshCellSides(self, mesh, i,j):
+
 class LightworldTerrain:
     
     def __init__(self, size):
