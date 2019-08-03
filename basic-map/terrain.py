@@ -27,6 +27,20 @@ class TerrainMesh:
         self.normal = GeomVertexWriter(self.vdata, 'normal')
         self.numVerts = 0
 
+    def addFace(self, textureScheme, face):
+        n = face.normal
+        for v in face.verts:
+            self.vertex.add_data3(v.getX(), v.getY(), v.getZ())
+            self.normal.addData3(n.getX(), n.getY(), n.getZ())
+            self.color.addData4f(1.0, 1.0, 1.0, 1.0)
+        for tc in face.texCoords:
+            schemeTC = textureScheme.getUVFromXY(face.texMat, tc.getX(), tc.getY())
+            self.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())               
+        mv = self.numVerts
+        for t in face.triangles:
+            self.tris.addVertices(mv+t.getX(), mv+t.getY(), mv+t.getZ())
+        self.numVerts += len(face.verts)
+
     def makeGeom(self):
         terrainGeom = Geom(self.vdata)
         terrainGeom.addPrimitive(self.tris)
@@ -110,22 +124,22 @@ class TextureScheme:
             }
     
     # Get UV coordinates from the right material, from xy in [0.0,1.0] range
-    def __getUVFromXY(self, material, x, y):
+    def getUVFromXY(self, material, x, y):
         offset = self.materialOffset[material]
         uv = LVector2f(x,y) * self.scale
         return offset + uv
 
-    def getUVFromXY(self, kHeight, normal, x, y):
+    def getMaterial(self, kHeight, normal):
         #if(normal.getZ() < 0.2):
-        #    return self.__getUVFromXY("rock", x, y)
+        #    return "rock"
         if(kHeight<0):
-            return self.__getUVFromXY("water", x, y)
+            return "water"
         elif(kHeight<1):
-            return self.__getUVFromXY("sand", x, y)
+            return "sand"
         elif(kHeight<7):
-            return self.__getUVFromXY("grass", x, y)
+            return "grass"
         else:
-            return self.__getUVFromXY("rock", x, y)
+            return "rock"
 
 ###############################################################################
 # Cell shape class
@@ -133,6 +147,7 @@ class CellFace:
     def __init__(self):
         self.verts = []
         self.texCoords = []
+        self.texMat = ""
         self.normal = []
         self.triangles = []
 
@@ -151,8 +166,8 @@ class CellShape:
     def __init__(self):
         pass
 
-    def getBasicFloorFace(XYZCellCenter, radius):
-        face = CellShape.CellFace()
+    def getBlockFloorFace(XYZCellCenter, radius):
+        face = CellFace()
         cx = XYZCellCenter.getX()
         cy = XYZCellCenter.getY()
         cz = XYZCellCenter.getZ()
@@ -163,8 +178,8 @@ class CellShape:
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
 
-    def getStraightSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
-        face = CellShape.CellFace()
+    def getBlockSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
+        face = CellFace()
         cx = XYZCellCenter.getX()
         cy = XYZCellCenter.getY()
         cz = XYZCellCenter.getZ()
@@ -260,79 +275,6 @@ class CellShape:
             face.triangles.append(LVector3i(0, v, v+1))
         return face
 
-    def getTaperedSideFace(XYZCellCenter, fullRadius, offsetRadius, ZHeight, orientation):
-        face = CellShape.CellFace()
-        cx = XYZCellCenter.getX()
-        cy = XYZCellCenter.getY()
-        cz = XYZCellCenter.getZ()
-        frd = fullRadius
-        ord = offsetRadius
-        zh = ZHeight
-        if(orientation == "xn"):
-            x = cx-r
-            y = cy
-            z = cz
-            face.verts = [ LVector3f(x, y+frd, z-zh), LVector3f(x, y-frd, z-zh), LVector3f(x, y-ord, z), LVector3f(x, y+ord, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
-        elif(orientation == "yn"):
-            x = cx
-            y = cy-r
-            z = cz-zo
-            face.verts = [ LVector3f(x-frd, y, z-zh), LVector3f(x+frd, y, z-zh), LVector3f(x+ord, y, z), LVector3f(x-ord, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
-        elif(orientation == "xp"):
-            x = cx+r
-            y = cy
-            z = cz-zo
-            face.verts = [ LVector3f(x, y-frd, z-zh), LVector3f(x, y+frd, z-zh), LVector3f(x, y+ord, z), LVector3f(x, y-ord, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
-        elif(orientation == "yp"):
-            x = cx
-            y = cy+r
-            z = cz-zo
-            face.verts = [ LVector3f(x+frd, y, z-zh), LVector3f(x-frd, y, z-zh), LVector3f(x-ord, y, z), LVector3f(x+ord, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
-        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
-        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
-        return face    
-
-    def getStraightSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
-        face = CellShape.CellFace()
-        cx = XYZCellCenter.getX()
-        cy = XYZCellCenter.getY()
-        cz = XYZCellCenter.getZ()
-        r = radius
-        zo = ZOffset
-        zh = ZHeight
-        if(orientation == "xn"):
-            x = cx-r
-            y = cy
-            z = cz-zo
-            face.verts = [ LVector3f(x, y+r, z-zh), LVector3f(x, y-r, z-zh), LVector3f(x, y-r, z), LVector3f(x, y+r, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
-        elif(orientation == "yn"):
-            x = cx
-            y = cy-r
-            z = cz-zo
-            face.verts = [ LVector3f(x-r, y, z-zh), LVector3f(x+r, y, z-zh), LVector3f(x+r, y, z), LVector3f(x-r, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
-        elif(orientation == "xp"):
-            x = cx+r
-            y = cy
-            z = cz-zo
-            face.verts = [ LVector3f(x, y-r, z-zh), LVector3f(x, y+r, z-zh), LVector3f(x, y+r, z), LVector3f(x, y-r, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
-        elif(orientation == "yp"):
-            x = cx
-            y = cy+r
-            z = cz-zo
-            face.verts = [ LVector3f(x+r, y, z-zh), LVector3f(x-r, y, z-zh), LVector3f(x-r, y, z), LVector3f(x+r, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
-        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
-        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
-        return face           
-
-
 ###############################################################################
 # Worker class meshing one cell of the terrain
 class TerrainCellMesher:
@@ -394,26 +336,8 @@ class TerrainCellMesher:
             else:
                 cell.valid = False
                 cell.heightDrop = 0     
-        #for side in self.directSides:
-        #    needOffset = (self.sideCell[side].valid and self.sideCell[side].heightDrop > 0)
-        #    self.sideRadius[side] = self.cellInRadius if needOffset else self.cellOutRadius
-
-    def __fillFace(self, mesh, i, j, face):
-        n = face.normal
-        for v in face.verts:
-            mesh.vertex.add_data3(v.getX(), v.getY(), v.getZ())
-            mesh.normal.addData3(n.getX(), n.getY(), n.getZ())
-            mesh.color.addData4f(1.0, 1.0, 1.0, 1.0)
-        kh = self.heightMap.getKHeightFromIJ(i, j)
-        for tc in face.texCoords:
-            schemeTC = self.textureScheme.getUVFromXY(kh, n, tc.getX(), tc.getY())
-            mesh.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())       
-        mv = mesh.numVerts
-        for t in face.triangles:
-            mesh.tris.addVertices(mv+t.getX(), mv+t.getY(), mv+t.getZ())
-        mesh.numVerts += len(face.verts)
     
-    def __meshCellFloorTaperedStyle(self, mesh, i, j):
+    def __meshCellTaperedStyle(self, mesh, i, j):
         # Cell properties
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
@@ -437,37 +361,31 @@ class TerrainCellMesher:
 
         # Fill floor cell                
         face = CellShape.getTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
-        self.__fillFace(mesh, i, j, face)
-
-        # Fill side cell
-        #for side in self.directSides:
-        #    for drop in range(0, max(1, sc[side].heightDrop)):
-        #        face = CellShape.getTaperedSideFace(center, radius, offsetRadius, drop * self.mapHeightStep, side)
-        #        self.__fillFace(mesh, i, j, face)
-        #    for drop in range(1, sc[side].heightDrop):
-        #        face = CellShape.getBasicSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
-        #        self.__fillFace(mesh, i, j, face)  
+        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
+        mesh.addFace(self.textureScheme, face)
     
     def __meshCellBlockStyle(self, mesh, i, j):
         # Construct geometry
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
         # Fill floor cell
-        face = CellShape.getBasicFloorFace(center, radius)
-        self.__fillFace(mesh, i, j, face)
+        face = CellShape.getBlockFloorFace(center, radius)
+        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
+        mesh.addFace(self.textureScheme, face)
         # Fill sides cell
         for side in self.directSides:
             neighb = self.sideCell[side]
             for drop in range(0, neighb.heightDrop):
-                face = CellShape.getBasicSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
-                self.__fillFace(mesh, i, j, face)    
+                face = CellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
+                mesh.addFace(self.textureScheme, face)
 
     def meshCell(self, mesh, i, j):
         self.__updateCellInfo(i, j)
         if(self.style == "blockStyle"):
             self.__meshCellBlockStyle(mesh, i, j)
         else:
-            self.__meshCellFloorTaperedStyle(mesh, i, j)
+            self.__meshCellTaperedStyle(mesh, i, j)
 
 ###############################################################################
 # Worker class generating the terrain mesh
@@ -475,7 +393,7 @@ class TerrainMesher:
 
     def __init__(self, size):
         self.size = size
-        self.style = "taperedStyle" # "blockStyle"
+        self.style = "blockStyle" # "blockStyle"
 
     def meshTerrain(self):
         self.heightMap = TerrainHeightMap(self.size)
@@ -489,334 +407,5 @@ class TerrainMesher:
                 cellMesher.meshCell(terrainMesh, i, j)
 
         return terrainMesh.makeGeom()
-"""  
-##############################################################################################################
-class LightworldTerrain:
-    
-    def __init__(self, size):
-        self.size = size
-        self.__terrainImage = self.__generateTerrainImage()
-
-    def __getHeight(self,i,j):
-        h = round((self.__terrainImage.getGray(i,j)-0.5)*20)/2
-        return h
-
-    def __generateTerrainImage(self):
-        #Perlin Noise Base
-        terrainImage = PNMImage(self.size, self.size, 1)
-        scale = 0.5 * 64 / self.size
-        stackedNoise = StackedPerlinNoise2(scale, scale, 8, 2, 0.5, self.size, 0)
-        terrainImage.perlinNoiseFill(stackedNoise)
-
-        #Make it look a bit more natural
-        for i in range(self.size):
-            for j in range(self.size):
-                g = terrainImage.getGray(i,j)
-                # make between -1 and 1, more land than water
-                g = (g-0.25)/0.75
-                # make mountain more spiky and plains more flat
-                if g>0:
-                    g = g ** 2
-                terrainImage.setGray(i,j,(g+1)/2)
-
-        return terrainImage
-
-    def getHeightAtPos(self,x,y):
-        h = self.__getHeight(round((x+self.size)/2), round((y+self.size)/2))
-        return h
-    
-    def generateTerrainGeom(self):
-
-        #Define format
-        format = GeomVertexFormat.getV3n3cpt2()
-        vdata = GeomVertexData('square', format, Geom.UHDynamic)
-        vertex = GeomVertexWriter(vdata, 'vertex')
-        normal = GeomVertexWriter(vdata, 'normal')
-        texcoord = GeomVertexWriter(vdata, 'texcoord')
-        tris = GeomTriangles(Geom.UHDynamic)
-
-        vIndex = 0
-
-        def addTexRock():
-            texcoord.addData2f(0.0, 0.0)
-            texcoord.addData2f(0.5, 0.0)
-            texcoord.addData2f(0.5, 0.5)
-            texcoord.addData2f(0.0, 0.5)
-        def addTexWater():
-            texcoord.addData2f(0.5, 0.0)
-            texcoord.addData2f(1.0, 0.0)
-            texcoord.addData2f(1.0, 0.5)
-            texcoord.addData2f(0.5, 0.5)
-        def addTexGrass():
-            texcoord.addData2f(0.0, 0.5)
-            texcoord.addData2f(0.5, 0.5)
-            texcoord.addData2f(0.5, 1.0)
-            texcoord.addData2f(0.0, 1.0)
-        def addTexSand():
-            texcoord.addData2f(0.5, 0.5)
-            texcoord.addData2f(1.0, 0.5)
-            texcoord.addData2f(1.0, 1.0)
-            texcoord.addData2f(0.5, 1.0)
-
-        def addTexFloor(altitude):
-            if(altitude<0):
-                addTexWater()
-            elif(altitude<0.5):
-                addTexSand()
-            elif(altitude<4):
-                addTexGrass()
-            else:
-                addTexRock()
-
-        def addTexSkirt(altitude, wallHeight):
-            if(altitude<=0):
-                addTexWater()
-            elif(altitude<0.5):
-                addTexSand()
-            elif(altitude<4) and (wallHeight<1):
-                addTexGrass()
-            else:
-                addTexRock()
-
-        def addTriangleFan(vStart, numVerts):
-            for i in range (1, numVerts-1):
-                tris.addVertices(vStart, vStart+i, vStart+i+1)
-            return vStart + numVerts
-
-        def addSquareVerts(vStart):
-            vNext = addTriangleFan(vStart, 4)
-            return vNext
-
-        def addFloorSquare(
-            x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
-            vertex.add_data3(x-xnOffset,y-ynOffset, z)
-            vertex.add_data3(x+xpOffset,y-ynOffset, z)
-            vertex.add_data3(x+xpOffset,y+ypOffset, z)
-            vertex.add_data3(x-xnOffset,y+ypOffset, z)
-            for x in range(4):
-                normal.addData3(0,0,1)
-            return addSquareVerts(vStart)
-
-        def addFloorTile(
-            x, y, z, 
-            cellRadius, offsetRadius,
-            xnIndent, xpIndent, ynIndent, ypIndent, 
-            xnynIndent, xnypIndent, xpynIndent, xpypIndent, 
-            vStart):
-            
-            # Compute side offsets
-            xnOffset = offsetRadius if xnIndent else cellRadius
-            xpOffset = offsetRadius if xpIndent else cellRadius
-            ynOffset = offsetRadius if ynIndent else cellRadius
-            ypOffset = offsetRadius if ypIndent else cellRadius
-
-            numVerts = 0
-
-            # xn yn corner
-            if(xnynIndent):
-                vertex.add_data3(x-cellRadius, y-offsetRadius, z)
-                vertex.add_data3(x-offsetRadius, y-cellRadius, z)
-                numVerts += 2
-            else:
-                vertex.add_data3(x-xnOffset,y-ynOffset, z)
-                numVerts += 1
-
-            # xp yn corner
-            if(xpynIndent):
-                vertex.add_data3(x+offsetRadius, y-cellRadius, z)
-                vertex.add_data3(x+cellRadius, y-offsetRadius, z)
-                numVerts += 2
-            else:
-                vertex.add_data3(x+xpOffset,y-ynOffset, z)
-                numVerts += 1
-
-            # xp yp corner
-            numVerts = 0
-            if(xpypIndent):
-                vertex.add_data3(x+cellRadius, y+offsetRadius, z)
-                vertex.add_data3(x+offsetRadius, y+cellRadius, z)
-                numVerts += 2
-            else:
-                vertex.add_data3(x+xpOffset,y+ynOffset, z)
-                numVerts += 1
-
-            # xn yp corner
-            numVerts = 0
-            if(xnypIndent):
-                vertex.add_data3(x-offsetRadius, y+cellRadius, z)
-                vertex.add_data3(x-cellRadius, y+offsetRadius, z)
-                numVerts += 2
-            else:
-                vertex.add_data3(x-xnOffset,y+ynOffset, z)
-                numVerts += 1
-
-            for x in range(numVerts):
-                normal.addData3(0,0,1)
-            return addTriangleFan(vStart, numVerts)
-
-
-        def addSkirtSquareXN(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
-            vertex.add_data3(x-1,y+1,z-0.5)
-            vertex.add_data3(x-1,y-1,z-0.5)
-            vertex.add_data3(x-xnOffset,y-ynOffset,z)
-            vertex.add_data3(x-xnOffset,y+ypOffset,z)
-            for x in range(4):
-                normal.addData3(-1,0,0)
-            return addSquareVerts(vStart)
-
-        def addSkirtSquareXP(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
-            vertex.add_data3(x+1,y-1,z-0.5)
-            vertex.add_data3(x+1,y+1,z-0.5)
-            vertex.add_data3(x+xpOffset,y+ypOffset,z)
-            vertex.add_data3(x+xpOffset,y-ynOffset,z)
-            for x in range(4):
-                normal.addData3(1,0,0)
-            return addSquareVerts(vStart)
-
-        def addSkirtSquareYP(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
-            vertex.add_data3(x+1,y+1,z-0.5)
-            vertex.add_data3(x-1,y+1,z-0.5)
-            vertex.add_data3(x-xnOffset,y+ypOffset,z)
-            vertex.add_data3(x+xpOffset,y+ypOffset,z)
-            for x in range(4):
-                normal.addData3(0,1,0)
-            return addSquareVerts(vStart)
-        
-        def addSkirtSquareYN(x, y, z, xnOffset, xpOffset, ynOffset, ypOffset, vStart):
-            vertex.add_data3(x-1,y-1,z-0.5)
-            vertex.add_data3(x+1,y-1,z-0.5)
-            vertex.add_data3(x+xpOffset,y-ynOffset,z)
-            vertex.add_data3(x-xnOffset,y-ynOffset,z)
-            for x in range(4):
-                normal.addData3(0,-1,0)
-            return addSquareVerts(vStart)
-
-        for i in range(self.size):
-            for j in range(self.size):
-                # add floor
-                x = 2*i-self.size
-                y = 2*j-self.size
-                z = self.__getHeight(i,j)
-
-                # Compute attributes of the cell for 4 straight directions
-                if(i==0):
-                    xnBorder = True 
-                    xnBottom = -5
-                else: 
-                    xnBorder = False
-                    xnBottom = self.__getHeight(i-1,j)
-
-                if(i==self.size-1):
-                    xpBorder = True 
-                    xpBottom = -5
-                else: 
-                    xpBorder = False
-                    xpBottom = self.__getHeight(i+1,j)
-
-                if(j==0):
-                    ynBorder = True 
-                    ynBottom = -5
-                else: 
-                    ynBorder = False
-                    ynBottom = self.__getHeight(i,j-1) 
-
-                if(j==self.size-1):
-                    ypBorder = True 
-                    ypBottom = -5
-                else: 
-                    ypBorder = False
-                    ypBottom = self.__getHeight(i,j+1)                
-
-                # Compute attributes of the cell for 4 diagonal directions
-                if(i==0 or j==0):
-                    xnynBorder = True 
-                    xnynBottom = -5
-                else: 
-                    xnynBorder = False
-                    xnynBottom = self.__getHeight(i-1,j-1)
-                              
-                if(i==0 or j==self.size-1):
-                    xnypBorder = True 
-                    xnypBottom = -5
-                else: 
-                    xnypBorder = False
-                    xnypBottom = self.__getHeight(i-1,j+1)
-
-                if(i==self.size-1 or j==0):
-                    xpynBorder = True 
-                    xpynBottom = -5
-                else: 
-                    xpynBorder = False
-                    xpynBottom = self.__getHeight(i+1,j-1)
-                              
-                if(i==self.size-1 or j==self.size-1):
-                    xpypBorder = True 
-                    xpypBottom = -5
-                else: 
-                    xpypBorder = False
-                    xpypBottom = self.__getHeight(i+1,j+1)
-
-                xnIndent = (xnBorder == False and xnBottom < z)
-                xpIndent = (xpBorder == False and xpBottom < z)
-                ynIndent = (ynBorder == False and ynBottom < z)
-                ypIndent = (ypBorder == False and ypBottom < z)
-
-                xnynIndent = (xnBorder == False and ynBorder == False and xnBottom == z and ynBottom == z and xnynBottom < z)
-                xnypIndent = (xnBorder == False and ypBorder == False and xnBottom == z and ypBottom == z and xnypBottom < z)
-                xpynIndent = (xpBorder == False and ynBorder == False and xpBottom == z and ynBottom == z and xpynBottom < z)
-                xpypIndent = (xpBorder == False and ypBorder == False and xpBottom == z and ypBottom == z and xpypBottom < z)
-
-                
-                vIndex = addFloorTile(x, y, z, 1, 0.5,
-                        xnIndent, xpIndent, ynIndent, ypIndent, 
-                        xnynIndent, xnypIndent, xpynIndent, xpypIndent, 
-                        vIndex)
-
-                addTexFloor(z)
-
-                #xn side
-                zSide = z
-                while zSide > xnBottom:
-                    vIndex = addSkirtSquareXN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)
-                    if i == 0:
-                        addTexSand()
-                    else:
-                        addTexSkirt(zSide, z-xnBottom)
-                    zSide = zSide - 0.5
-
-                #xp side
-                zSide = z
-                while zSide > xpBottom:
-                    vIndex = addSkirtSquareXP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex) 
-                    if i == self.size-1:
-                        addTexSand()
-                    else:
-                        addTexSkirt(zSide, z-xpBottom)
-                    zSide = zSide - 0.5
-
-                #yn side
-                zSide = z
-                while zSide > ynBottom:
-                    vIndex = addSkirtSquareYN(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
-                    if ynBorder:
-                        addTexSand()
-                    else:
-                        addTexSkirt(zSide, z-ynBottom)
-                    zSide = zSide - 0.5
-
-                #yp side
-                zSide = z
-                while zSide > ypBottom:
-                    vIndex = addSkirtSquareYP(x, y, zSide, xnOffset, xpOffset, ynOffset, ypOffset, vIndex)  
-                    if ypBorder == True:
-                        addTexSand()
-                    else:
-                        addTexSkirt(zSide, z-ypBottom)
-                    zSide = zSide - 0.5
-
-        terrainCube = Geom(vdata)
-        terrainCube.addPrimitive(tris)
-        return terrainCube
-"""
 
 
