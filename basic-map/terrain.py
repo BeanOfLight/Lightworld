@@ -62,8 +62,9 @@ class TerrainHeightMap:
     def isValid(self, i,j):
         return i >= 0 and i < self.size and j >= 0 and j < self.size
     
+    # Height in integer increments between -10 and 10
     def getKHeightFromIJ(self, i, j):
-        return round((self.__terrainImage.getGray(i,j)-0.5)*20)/2
+        return round((self.__terrainImage.getGray(i,j)-0.5)*20)
 
     def getZHeightFromIJ(self, i, j):
         return self.getKHeightFromIJ(i,j) * self.heightStep 
@@ -82,6 +83,36 @@ class TerrainHeightMap:
             2*IJLocation.getX()-self.size, 
             2*IJLocation.getY()-self.size)
 
+###############################################################################
+# Class managing texture computation
+class TextureScheme:
+
+    def __init__(self):
+        self.scale = 0.5
+        self.materialOffset = {
+            "rock"  : LVector2f(0.0, 0.0),
+            "grass" : LVector2f(0.0, 0.5),
+            "sand"  : LVector2f(0.5, 0.5),
+            "water" : LVector2f(0.5, 0.0)
+            }
+    
+    # Get UV coordinates from the right material, from xy in [0.0,1.0] range
+    def __getUVFromXY(self, material, x, y):
+        offset = self.materialOffset[material]
+        uv = LVector2f(x,y) * self.scale
+        return offset + uv
+
+    def getUVFromXY(self, kHeight, normal, x, y):
+        if(normal.getZ() < 0.2):
+            return self.__getUVFromXY("rock", x, y)
+        elif(kHeight<0):
+            return self.__getUVFromXY("water", x, y)
+        elif(kHeight<1):
+            return self.__getUVFromXY("sand", x, y)
+        elif(kHeight<7):
+            return self.__getUVFromXY("grass", x, y)
+        else:
+            return self.__getUVFromXY("rock", x, y)
 
 ###############################################################################
 # Worker class meshing one cell of the terrain
@@ -107,7 +138,7 @@ class TerrainCellMesher:
     #           +--------+
     #  (1) xnyn   (2) yn   (3) xpyn
 
-    def __init__(self, terrainHeightMap):
+    def __init__(self, terrainHeightMap, TextureScheme):
         # Parameters      
         self.cellOutRadius = 1.0
         self.cellInRadius = 0.5
@@ -115,6 +146,7 @@ class TerrainCellMesher:
         
         # Source Data
         self.heightMap = terrainHeightMap
+        self.textureScheme = TextureScheme
 
         # Cell Information
         self.height = 0 #height in map increments
@@ -157,12 +189,6 @@ class TerrainCellMesher:
             z = self.heightMap.getZHeightFromIJ(i, j)
             mesh.vertex.add_data3(x, y, z)
             numNewVerts += 1    
-
-        # vertex tex coords
-        for side in self.diagonalSides:
-            x = 0.25 + self.sideCell[side].di * 0.25
-            y = 0.25 + self.sideCell[side].dj * 0.25
-            mesh.texcoord.addData2f(x, y)
         
         # triangles
         for index in range (1, numNewVerts-1):
@@ -173,8 +199,17 @@ class TerrainCellMesher:
         mesh.numVerts += numNewVerts
 
         # normals
+        faceNormal = LVector3(0,0,1)
         for x in range(4):
-            mesh.normal.addData3(0,0,1)
+            mesh.normal.addData3(faceNormal.getX(), faceNormal.getY(), faceNormal.getZ())
+
+        # vertex tex coords
+        faceKHeight = self.heightMap.getKHeightFromIJ(i, j)
+        for side in self.diagonalSides:
+            x = 0.5 + self.sideCell[side].di * 0.5
+            y = 0.5 + self.sideCell[side].dj * 0.5
+            textureCoord = self.textureScheme.getUVFromXY(faceKHeight, faceNormal, x, y)
+            mesh.texcoord.addData2f(textureCoord.getX(), textureCoord.getY())
 
         # color
         for x in range(4):
@@ -195,7 +230,8 @@ class TerrainMesher:
     def meshTerrain(self):
         self.heightMap = TerrainHeightMap(self.size)
         self.heightMap.generateTerrain()
-        cellMesher = TerrainCellMesher(self.heightMap)
+        self.textureScheme = TextureScheme()
+        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme)
 
         terrainMesh = TerrainMesh()
         for i in range(self.size):
