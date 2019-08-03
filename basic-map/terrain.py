@@ -101,12 +101,12 @@ class TerrainHeightMap:
 class TextureScheme:
 
     def __init__(self):
-        self.scale = 0.5
+        self.scale = 0.4
         self.materialOffset = {
-            "rock"  : LVector2f(0.0, 0.0),
-            "grass" : LVector2f(0.0, 0.5),
-            "sand"  : LVector2f(0.5, 0.5),
-            "water" : LVector2f(0.5, 0.0)
+            "rock"  : LVector2f(0.05, 0.05),
+            "grass" : LVector2f(0.05, 0.55),
+            "sand"  : LVector2f(0.55, 0.55),
+            "water" : LVector2f(0.55, 0.05)
             }
     
     # Get UV coordinates from the right material, from xy in [0.0,1.0] range
@@ -160,7 +160,19 @@ class CellShape:
         face.normal = LVector3f(0.0, 0.0, 1.0)
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
-    
+
+    def getDirectSideFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides):
+        face = CellShape.CellFace()
+        cx = XYZCellCenter.getX()
+        cy = XYZCellCenter.getY()
+        cz = XYZCellCenter.getZ()
+        r = radius
+        face.verts = [ LVector3f(cx-r, cy-r, cz), LVector3f(cx+r, cy-r, cz), LVector3f(cx+r, cy+r, cz), LVector3f(cx-r, cy+r, cz)]
+        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
+        face.normal = LVector3f(0.0, 0.0, 1.0)
+        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
+        return face
+
     def getBasicSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
         face = CellShape.CellFace()
         cx = XYZCellCenter.getX()
