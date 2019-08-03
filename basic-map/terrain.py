@@ -161,35 +161,65 @@ class CellShape:
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
 
-    def getDirectSideTapereFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides):
+    def getDirectSideTapereFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides, taperedCorner):
         face = CellShape.CellFace()
+
         cx = XYZCellCenter.getX()
         cy = XYZCellCenter.getY()
         cz = XYZCellCenter.getZ()
         frd = fullRadius
         ord = offsetRadius
         r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
+        tcx = 0.5
+        tcy = 0.5
+        tfrd = 0.5
+        tord = 0.5 * offsetRadius / fullRadius
+        tr = {"xn" : tfrd, "yn" : tfrd, "xp": tfrd, "yp" : tfrd }
+
         for side in taperedSides:
             r[side] = ord
-        face.verts = [ 
-            LVector3f(cx-r["xn"], cy-r["yn"], cz), 
-            LVector3f(cx+r["xp"], cy-r["yn"], cz), 
-            LVector3f(cx+r["xp"], cy+r["yp"], cz),
-            LVector3f(cx-r["xn"], cy+r["yp"], cz)]
-        cx = 0.5
-        cy = 0.5
-        frd = 0.5
-        ord = 0.5 * offsetRadius / fullRadius
-        r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
-        for side in taperedSides:
-            r[side] = ord
-        face.texCoords = [ 
-            LVector2f(cx-r["xn"], cy-r["yn"]), 
-            LVector2f(cx+r["xp"], cy-r["yn"]), 
-            LVector2f(cx+r["xp"], cy+r["yp"]), 
-            LVector2f(cx-r["xn"], cy+r["yp"])]
+            tr[side] = tord
+
+        if "xnyn" in taperedCorner:
+            face.verts.append(LVector3f(cx-frd, cy-ord, cz))
+            face.texCoords.append(LVector2f(tcx-tfrd, tcy-tord))
+            face.verts.append(LVector3f(cx-ord, cy-frd, cz))
+            face.texCoords.append(LVector2f(tcx-tord, tcy-tfrd))
+        else:
+            face.verts.append(LVector3f(cx-r["xn"], cy-r["yn"], cz))
+            face.texCoords.append(LVector2f(tcx-tr["xn"], tcy-tr["yn"]))  
+
+        if "xpyn" in taperedCorner:
+            face.verts.append(LVector3f(cx+ord, cy-frd, cz)) 
+            face.texCoords.append(LVector2f(tcx+tord, tcy-tfrd))
+            face.verts.append(LVector3f(cx+frd, cy-ord, cz)) 
+            face.texCoords.append(LVector2f(tcx+tfrd, tcy-tord))
+        else:
+            face.verts.append(LVector3f(cx+r["xp"], cy-r["yn"], cz)) 
+            face.texCoords.append(LVector2f(tcx+tr["xp"], tcy-tr["yn"]))
+
+        if "xpyp" in taperedCorner:
+            face.verts.append(LVector3f(cx+frd, cy+ord, cz))
+            face.texCoords.append(LVector2f(tcx+tfrd, tcy+tord))
+            face.verts.append(LVector3f(cx+ord, cy+frd, cz))
+            face.texCoords.append(LVector2f(tcx+tord, tcy+tfrd))
+        else:
+            face.verts.append(LVector3f(cx+r["xp"], cy+r["yp"], cz))
+            face.texCoords.append(LVector2f(tcx+tr["xp"], tcy+tr["yp"]))
+
+        if "xnyp" in taperedCorner:
+            face.verts.append(LVector3f(cx-ord, cy+frd, cz))
+            face.texCoords.append(LVector2f(tcx-tord, tcy+tfrd))
+            face.verts.append(LVector3f(cx-frd, cy+ord, cz))
+            face.texCoords.append(LVector2f(tcx-tfrd, tcy+tord))
+        else:
+            face.verts.append(LVector3f(cx-r["xn"], cy+r["yp"], cz))
+            face.texCoords.append(LVector2f(tcx-tr["xn"], tcy+tr["yp"]))
+
         face.normal = LVector3f(0.0, 0.0, 1.0)
-        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
+        nv = len(face.verts)
+        for v in range(1,nv-1):
+            face.triangles.append(LVector3i(0, v, v+1))
         return face
 
     def getBasicSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
@@ -316,11 +346,23 @@ class TerrainCellMesher:
         radius = self.cellOutRadius
         offsetRadius = self.cellInRadius
         taperedSide = []
+        taperedCorner = []
+        sc = self.sideCell
         for side in self.directSides:
-            if self.sideCell[side].heightDrop > 0:
+            if sc[side].heightDrop > 0:
                 taperedSide.append(side)
+        if sc["xn"].heightDrop == 0 and sc["yn"].heightDrop == 0 and sc["xnyn"].heightDrop > 0:
+            taperedCorner.append("xnyn")
+        if sc["xp"].heightDrop == 0 and sc["yn"].heightDrop == 0 and sc["xpyn"].heightDrop > 0:
+            taperedCorner.append("xpyn")
+        if sc["xp"].heightDrop == 0 and sc["yp"].heightDrop == 0 and sc["xpyp"].heightDrop > 0:
+            taperedCorner.append("xpyp")
+        if sc["xn"].heightDrop == 0 and sc["yp"].heightDrop == 0 and sc["xnyp"].heightDrop > 0:
+            taperedCorner.append("xnyp")
+
+        # taperedCorner = [ "xnyn", "xpyn", "xpyp", "xnyp" ]
                 
-        face = CellShape.getDirectSideTapereFloorFace(center, radius, offsetRadius, taperedSide)
+        face = CellShape.getDirectSideTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
         # Fill Mesh Structure
         self.__fillFace(mesh, i, j, face)
     
