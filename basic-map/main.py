@@ -45,6 +45,9 @@ def addTitle(text):
 # Game Class
 class LightworldBasic(ShowBase):
     def __init__(self):
+        #Interactive or overview mode
+        self.overview = True
+
         # Set up the window, camera, etc.
         ShowBase.__init__(self)
 
@@ -52,15 +55,16 @@ class LightworldBasic(ShowBase):
         self.win.setClearColor((0.4, 0.7, 1.0, 1))
 
         # Post the instructions
-        self.title = addTitle("Lightworld: Explore the map")
+        self.title = addTitle("Lightworld: Explore the map")       
         self.inst1 = addInstructions(0.06, "[ESC]: Quit")
-        self.inst2 = addInstructions(0.12, "[Left Arrow]: Rotate Left")
-        self.inst3 = addInstructions(0.18, "[Right Arrow]: Rotate Right")
-        self.inst4 = addInstructions(0.24, "[Up Arrow]: Move Forward")
+        self.inst2 = addInstructions(0.12, "[Space Bar]: Toggle Overview")
+        self.inst3 = addInstructions(0.18, "[Left Arrow]: Rotate Left")
+        self.inst4 = addInstructions(0.24, "[Right Arrow]: Rotate Right")
+        self.inst5 = addInstructions(0.30, "[Up Arrow]: Move Forward")
 
         # Terrain Map
-        terrainSize = 4
-        self.terrain = TerrainMesher(terrainSize) 
+        self.terrainSize = 64
+        self.terrain = TerrainMesher(self.terrainSize) 
         terrainMesh = self.terrain.meshTerrain()
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMesh)
@@ -84,18 +88,14 @@ class LightworldBasic(ShowBase):
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
+        self.accept("space", self.toggleOverview)
         self.accept("arrow_left", self.turnLeft)
         self.accept("arrow_right", self.turnRight)
         self.accept("arrow_up", self.moveForward)
-
         taskMgr.add(self.move, "moveTask")
 
-        # Set up the camera
         self.disableMouse()
-        self.camera.setPos(self.avatarControler.curCamPos)
-        self.camera.lookAt(self.avatarControler.curPos)
-        self.camLens.setFocalLength(0.4)
-        self.camLens.setNear(0.1)
+        self.toggleOverview()
 
         # Create some lighting
         alight = AmbientLight('alight')
@@ -108,16 +108,38 @@ class LightworldBasic(ShowBase):
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
     
+    def toggleOverview(self):
+        self.overview = not self.overview
+        if self.overview == False:
+            self.camera.setPos(self.avatarControler.curCamPos)
+            self.camera.lookAt(self.avatarControler.curPos)
+            self.camLens.setFocalLength(0.4)
+            self.camLens.setNear(0.1)
+            self.inst3.show()
+            self.inst4.show()
+            self.inst5.show()
+        else:
+            self.disableMouse()
+            self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
+            self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
+            self.camLens.setFocalLength(1)
+            self.inst3.hide()
+            self.inst4.hide()
+            self.inst5.hide()
+
     def moveForward(self):
-        target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
-        target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
-        self.avatarControler.triggerMoveForward(target)
+        if self.overview == False:
+            target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
+            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            self.avatarControler.triggerMoveForward(target)
 
     def turnLeft(self):
-        self.avatarControler.triggerTurnLeft()
+        if self.overview == False:
+            self.avatarControler.triggerTurnLeft()
     
     def turnRight(self):
-        self.avatarControler.triggerTurnRight()
+        if self.overview == False:
+            self.avatarControler.triggerTurnRight()
 
     def move(self, task):       
         if(self.avatarControler.moving == True):
