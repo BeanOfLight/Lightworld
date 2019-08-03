@@ -34,7 +34,7 @@ class LightworldAvatarControler:
          self.curPos = LVector3(x,y, terrainHeight + self.avatarHeight)
          self.curCamPos = self.curPos - self.curMoveDir * self.camDist
 
-    def triggerMoveForward(self, target):
+    def triggerMove(self, target):
         if(self.canReceiveCommand):
             self.moving = True
             self.canReceiveCommand = False

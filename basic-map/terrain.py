@@ -151,6 +151,35 @@ class CellFace:
         self.normal = []
         self.triangles = []
 
+
+###############################################################################
+# Cell shape class refactored
+class CellShape2:
+    
+    def __init__(self, center, outRadius, inRadius, zStep):
+        self.outRadius = outRadius
+        self.inRadius = inRadius
+        self.zStep = zStep
+        self.center = center
+
+    def getOuterTopFlatFace():
+        pass
+
+    def getSideFlatFace():
+        pass
+
+    def getInnerTopFlatFace():
+        pass
+
+    def getSideTopFlatFace(side):
+        pass
+
+    def getCornerTopFlatFace():
+        pass
+
+    
+
+
 ###############################################################################
 # Cell shape class
 class CellShape:
@@ -363,6 +392,14 @@ class TerrainCellMesher:
         face = CellShape.getTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
         face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
         mesh.addFace(self.textureScheme, face)
+
+        # Fill sides cell
+        for side in self.directSides:
+            neighb = self.sideCell[side]
+            for drop in range(0, neighb.heightDrop):
+                face = CellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
+                mesh.addFace(self.textureScheme, face)
     
     def __meshCellBlockStyle(self, mesh, i, j):
         # Construct geometry
@@ -393,7 +430,7 @@ class TerrainMesher:
 
     def __init__(self, size):
         self.size = size
-        self.style = "blockStyle" # "blockStyle"
+        self.style = "taperedStyle" # "blockStyle"
 
     def meshTerrain(self):
         self.heightMap = TerrainHeightMap(self.size)

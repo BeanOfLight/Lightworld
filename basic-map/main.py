@@ -53,9 +53,10 @@ class LightworldBasic(ShowBase):
         self.inst3 = addInstructions(0.18, "[Left Arrow]: Rotate Left")
         self.inst4 = addInstructions(0.24, "[Right Arrow]: Rotate Right")
         self.inst5 = addInstructions(0.30, "[Up Arrow]: Move Forward")
+        self.inst6 = addInstructions(0.36, "[Down Arrow]: Move Backward")
 
         # Terrain Map
-        self.terrainSize = 32
+        self.terrainSize = 64
         self.terrain = TerrainMesher(self.terrainSize) 
         terrainMesh = self.terrain.meshTerrain()
         snode = GeomNode('terrainPatch')
@@ -84,6 +85,7 @@ class LightworldBasic(ShowBase):
         self.accept("arrow_left", self.turnLeft)
         self.accept("arrow_right", self.turnRight)
         self.accept("arrow_up", self.moveForward)
+        self.accept("arrow_down", self.moveBackward)
         taskMgr.add(self.move, "moveTask")
 
         self.disableMouse()
@@ -110,6 +112,7 @@ class LightworldBasic(ShowBase):
             self.inst3.show()
             self.inst4.show()
             self.inst5.show()
+            self.inst6.show()
         else:
             self.disableMouse()
             self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
@@ -118,12 +121,19 @@ class LightworldBasic(ShowBase):
             self.inst3.hide()
             self.inst4.hide()
             self.inst5.hide()
+            self.inst6.hide()
 
     def moveForward(self):
         if self.overview == False:
             target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
             target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
-            self.avatarControler.triggerMoveForward(target)
+            self.avatarControler.triggerMove(target)
+
+    def moveBackward(self):
+        if self.overview == False:
+            target = self.avatarControler.curPos - self.avatarControler.curMoveDir * 2.0
+            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            self.avatarControler.triggerMove(target)
 
     def turnLeft(self):
         if self.overview == False:
