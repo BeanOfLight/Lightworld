@@ -199,56 +199,99 @@ class CellShape:
         self.inRadius = inRadius
         self.zStep = zStep
         self.center = center
+        self.__cacheShape()
 
-    def getBlockFloorFace(self, XYZCellCenter, radius):
-        face = CellFace()
+    def __cacheShape(self):
         cx = self.center.getX()
         cy = self.center.getY()
         cz = self.center.getZ()
+        bz = cz-self.zStep
         r = self.outRadius
-        face.verts = [ LVector3f(cx-r, cy-r, cz), LVector3f(cx+r, cy-r, cz), LVector3f(cx+r, cy+r, cz), LVector3f(cx-r, cy+r, cz)]
-        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
-        face.normal = LVector3f(0.0, 0.0, 1.0)
-        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
+        self.cacheCapTopOuterCornerVerts = {
+            "xnyn" : LVector3f(cx-r, cy-r, cz),
+            "xpyn" : LVector3f(cx+r, cy-r, cz), 
+            "xpyp" : LVector3f(cx+r, cy+r, cz),
+            "xnyp" : LVector3f(cx-r, cy+r, cz)}
+        self.cacheCapXNOuterCornerVerts
+
+    def __getCapTopOuterCornerVerts(self):
+        vList = []
+        for dir, vec in self.cacheCapTopOuterCornerVerts.items():
+            vList.append(vec)
+        return vList
+    
+    def __getSquareTexCoords():
+        tc = [ 
+            LVector2f(0.0, 0.0), 
+            LVector2f(1.0, 0.0), 
+            LVector2f(1.0, 1.0), 
+            LVector2f(0.0, 1.0)]
+        return tc
+
+    def __getCropSquareTexCoords(xnCrop, ynCrop, xpCrop, ypCrop):
+        tc = [ 
+            LVector2f(xnCrop, ynCrop), 
+            LVector2f(1.0-xpCrop, ynCrop), 
+            LVector2f(1.0-xpCrop, 1.0-ypCrop), 
+            LVector2f(xnCrop, 1.0-ypCrop) ]
+        return tc
+        
+    def __getNormal(listVerts):
+        v1 = listVerts[1] - listVerts[0]
+        v2 = listVerts[2] - listVerts[1]
+        n = v1.cross(v2)
+        return n.normalized()        
+    
+    def __getTriFan(listVerts):
+        fan = []
+        nv = len(listVerts)
+        for v in range(1,nv-1):
+            fan.append(LVector3i(0, v, v+1))
+        return fan
+
+    def getBlockFloorFace(self):
+        face = CellFace()
+        face.verts = self.__getCapTopOuterCornerVerts()
+        face.texCoords = CellShape.__getSquareTexCoords()
+        face.normal = CellShape.__getNormal(face.verts)
+        face.triangles = CellShape.__getTriFan(face.verts)
         return face
 
-    def getBlockSideFace(self, XYZCellCenter, radius, ZOffset, ZHeight, orientation):
+    def getBlockSideFace(self, ZOffset, orientation):
         face = CellFace()
         cx = self.center.getX()
         cy = self.center.getY()
         cz = self.center.getZ()
         r = self.outRadius
         zo = ZOffset
-        zh = ZHeight
+        zh = self.zStep
         if(orientation == "xn"):
             x = cx-r
             y = cy
             z = cz-zo
             face.verts = [ LVector3f(x, y+r, z-zh), LVector3f(x, y-r, z-zh), LVector3f(x, y-r, z), LVector3f(x, y+r, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
         elif(orientation == "yn"):
             x = cx
             y = cy-r
             z = cz-zo
             face.verts = [ LVector3f(x-r, y, z-zh), LVector3f(x+r, y, z-zh), LVector3f(x+r, y, z), LVector3f(x-r, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
         elif(orientation == "xp"):
             x = cx+r
             y = cy
             z = cz-zo
             face.verts = [ LVector3f(x, y-r, z-zh), LVector3f(x, y+r, z-zh), LVector3f(x, y+r, z), LVector3f(x, y-r, z)]
-            face.normal = LVector3f(-1.0, 0.0, 0.0)
         elif(orientation == "yp"):
             x = cx
             y = cy+r
             z = cz-zo
             face.verts = [ LVector3f(x+r, y, z-zh), LVector3f(x-r, y, z-zh), LVector3f(x-r, y, z), LVector3f(x+r, y, z)]
-            face.normal = LVector3f(0.0, -1.0, 0.0)
-        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
-        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
+        face.normal = CellShape.__getNormal(face.verts)
+        texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius)
+        face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
+        face.triangles = CellShape.__getTriFan(face.verts)
         return face 
 
-    def getTapereFloorFace(self, XYZCellCenter, fullRadius, offsetRadius, taperedSides, taperedCorner):
+    def getTapereFloorFace(self, taperedSides, taperedCorner):
         face = CellFace()
 
         cx = self.center.getX()
@@ -303,10 +346,8 @@ class CellShape:
             face.verts.append(LVector3f(cx-r["xn"], cy+r["yp"], cz))
             face.texCoords.append(LVector2f(tcx-tr["xn"], tcy+tr["yp"]))
 
-        face.normal = LVector3f(0.0, 0.0, 1.0)
-        nv = len(face.verts)
-        for v in range(1,nv-1):
-            face.triangles.append(LVector3i(0, v, v+1))
+        face.normal = CellShape.__getNormal(face.verts)
+        face.triangles = CellShape.__getTriFan(face.verts)
         return face
 
 ###############################################################################
@@ -395,7 +436,7 @@ class TerrainCellMesher:
             taperedCorner.append("xnyp")
 
         # Fill floor cell                
-        face = cellShape.getTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
+        face = cellShape.getTapereFloorFace(taperedSide, taperedCorner)
         face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
         mesh.addFace(self.textureScheme, face)
 
@@ -403,7 +444,7 @@ class TerrainCellMesher:
         for side in self.directSides:
             neighb = self.sideCell[side]
             for drop in range(0, neighb.heightDrop):
-                face = cellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
                 face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
                 mesh.addFace(self.textureScheme, face)
     
@@ -414,7 +455,7 @@ class TerrainCellMesher:
         cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
         
         # Fill floor cell
-        face = cellShape.getBlockFloorFace(center, radius)
+        face = cellShape.getBlockFloorFace()
         face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
         mesh.addFace(self.textureScheme, face)
         
@@ -422,7 +463,7 @@ class TerrainCellMesher:
         for side in self.directSides:
             neighb = self.sideCell[side]
             for drop in range(0, neighb.heightDrop):
-                face = cellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
                 face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
                 mesh.addFace(self.textureScheme, face)
 

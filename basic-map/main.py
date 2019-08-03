@@ -105,6 +105,11 @@ class LightworldBasic(ShowBase):
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
     
+    def updateAvatarPosition(self):
+        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
+        self.avatar.setPos(self.avatarControler.curPos)
+        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+    
     def updateCameraPosition(self):
         if self.overview == False:
             self.camera.setPos(self.avatarControler.curCamPos)
@@ -116,6 +121,8 @@ class LightworldBasic(ShowBase):
     def updateTerrain(self):
         self.terrain.generateTerrain(self.terrainSize)
         self.updateTerrainMesh()
+        self.updateAvatarPosition()
+        self.updateCameraPosition()
 
     def updateTerrainMesh(self):
         self.map.removeNode()
@@ -123,14 +130,7 @@ class LightworldBasic(ShowBase):
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMesh)
         self.map = render.attachNewNode(snode)
-        self.map.setTwoSided(True)
         self.map.setTexture(self.texture)
-
-        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
-        self.avatar.setPos(self.avatarControler.curPos)
-        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
-
-        self.updateCameraPosition()
     
     def toggleTerrainStyle(self):
         if(self.terrainStyle == "taperedStyle"):
