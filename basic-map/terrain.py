@@ -104,8 +104,8 @@ class TextureScheme:
         self.scale = 0.4
         self.materialOffset = {
             "rock"  : LVector2f(0.05, 0.05),
-            "grass" : LVector2f(0.05, 0.55),
             "sand"  : LVector2f(0.55, 0.55),
+            "grass" : LVector2f(0.05, 0.55),
             "water" : LVector2f(0.55, 0.05)
             }
     
@@ -161,14 +161,33 @@ class CellShape:
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
 
-    def getDirectSideFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides):
+    def getDirectSideTapereFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides):
         face = CellShape.CellFace()
         cx = XYZCellCenter.getX()
         cy = XYZCellCenter.getY()
         cz = XYZCellCenter.getZ()
-        r = radius
-        face.verts = [ LVector3f(cx-r, cy-r, cz), LVector3f(cx+r, cy-r, cz), LVector3f(cx+r, cy+r, cz), LVector3f(cx-r, cy+r, cz)]
-        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
+        frd = fullRadius
+        ord = offsetRadius
+        r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
+        for side in taperedSides:
+            r[side] = ord
+        face.verts = [ 
+            LVector3f(cx-r["xn"], cy-r["yn"], cz), 
+            LVector3f(cx+r["xp"], cy-r["yn"], cz), 
+            LVector3f(cx+r["xp"], cy+r["yp"], cz),
+            LVector3f(cx-r["xn"], cy+r["yp"], cz)]
+        cx = 0.5
+        cy = 0.5
+        frd = 0.5
+        ord = 0.5 * offsetRadius / fullRadius
+        r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
+        for side in taperedSides:
+            r[side] = ord
+        face.texCoords = [ 
+            LVector2f(cx-r["xn"], cy-r["yn"]), 
+            LVector2f(cx+r["xp"], cy-r["yn"]), 
+            LVector2f(cx+r["xp"], cy+r["yp"]), 
+            LVector2f(cx-r["xn"], cy+r["yp"])]
         face.normal = LVector3f(0.0, 0.0, 1.0)
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
@@ -235,7 +254,7 @@ class TerrainCellMesher:
     #           +--------+
     #  (1) xnyn   (2) yn   (3) xpyn
 
-    def __init__(self, terrainHeightMap, TextureScheme):
+    def __init__(self, terrainHeightMap, textureScheme, style):
         # Parameters      
         self.cellOutRadius = 1.0
         self.cellInRadius = 0.5
@@ -243,7 +262,8 @@ class TerrainCellMesher:
         
         # Source Data
         self.heightMap = terrainHeightMap
-        self.textureScheme = TextureScheme
+        self.textureScheme = textureScheme
+        self.style = style
 
         # Cell Information
         self.height = 0 #height in map increments
@@ -259,7 +279,6 @@ class TerrainCellMesher:
             "yp"   : self.NeighbCell(  0,  1),
             "xnyp" : self.NeighbCell( -1,  1)
         }
-        #self.sideRadius = {}
 
     # Private
     def __updateCellInfo(self, i, j):
@@ -291,7 +310,21 @@ class TerrainCellMesher:
             mesh.tris.addVertices(mv+t.getX(), mv+t.getY(), mv+t.getZ())
         mesh.numVerts += len(face.verts)
     
-    def __meshCellFloor(self, mesh, i, j):
+    def __meshCellFloorTaperedStyle(self, mesh, i, j):
+        # Construct geometry
+        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
+        radius = self.cellOutRadius
+        offsetRadius = self.cellInRadius
+        taperedSide = []
+        for side in self.directSides:
+            if self.sideCell[side].heightDrop > 0:
+                taperedSide.append(side)
+                
+        face = CellShape.getDirectSideTapereFloorFace(center, radius, offsetRadius, taperedSide)
+        # Fill Mesh Structure
+        self.__fillFace(mesh, i, j, face)
+    
+    def __meshCellFloorBlockStyle(self, mesh, i, j):
         # Construct geometry
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
@@ -299,7 +332,7 @@ class TerrainCellMesher:
         # Fill Mesh Structure
         self.__fillFace(mesh, i, j, face)
 
-    def __meshCellSides(self, mesh, i, j):
+    def __meshCellSidesBlockStyle(self, mesh, i, j):
         # Construct geometry
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
@@ -311,9 +344,12 @@ class TerrainCellMesher:
          
     def meshCell(self, mesh, i, j):
         self.__updateCellInfo(i, j)
-        self.__meshCellFloor(mesh, i, j)
-        self.__meshCellSides(mesh, i, j)
-
+        if(self.style == "blockStyle"):
+            self.__meshCellFloorBlockStyle(mesh, i, j)
+            self.__meshCellSidesBlockStyle(mesh, i, j)
+        else:
+            self.__meshCellFloorTaperedStyle(mesh, i, j)
+            self.__meshCellSidesBlockStyle(mesh, i, j)
 
 ###############################################################################
 # Worker class generating the terrain mesh
@@ -321,12 +357,13 @@ class TerrainMesher:
 
     def __init__(self, size):
         self.size = size
+        self.style = "taperedStyle" # "blockStyle"
 
     def meshTerrain(self):
         self.heightMap = TerrainHeightMap(self.size)
         self.heightMap.generateTerrain()
         self.textureScheme = TextureScheme()
-        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme)
+        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme, self.style)
 
         terrainMesh = TerrainMesh()
         for i in range(self.size):
