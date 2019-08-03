@@ -6,7 +6,7 @@
 from panda3d.core import StackedPerlinNoise2, PNMImage
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
-from panda3d.core import LVector3, LVector2f, LVector2i
+from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
 import random
 import math
 
@@ -115,6 +115,40 @@ class TextureScheme:
             return self.__getUVFromXY("rock", x, y)
 
 ###############################################################################
+# Cell shape class
+class CellShape:
+
+    class CellFace:
+        def __init__(self):
+            self.verts = []
+            self.texCoords = []
+            self.normal = []
+            self.triangles = []
+
+    #  (7) xnyp   (6) yp   (5) xpyp
+    #           +--------+
+    #           |        |
+    #    (0) xn |        | (4) xp
+    #           |        |
+    #           +--------+
+    #  (1) xnyn   (2) yn   (3) xpyn
+
+    def __init__(self):
+        pass
+
+    def getBasicFloorFace(XYZcenter, radius):
+        face = CellShape.CellFace()
+        cx = XYZcenter.getX()
+        cy = XYZcenter.getY()
+        cz = XYZcenter.getZ()
+        r = radius
+        face.verts = [ LVector3f(cx-r, cy-r, cz), LVector3f(cx+r, cy-r, cz), LVector3f(cx+r, cy+r, cz), LVector3f(cx-r, cy+r, cz)]
+        face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
+        face.normal = LVector3f(0.0, 0.0, 1.0)
+        face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
+        return face
+
+###############################################################################
 # Worker class meshing one cell of the terrain
 class TerrainCellMesher:
 
@@ -162,30 +196,51 @@ class TerrainCellMesher:
             "yp"   : self.NeighbCell(  0,  1),
             "xnyp" : self.NeighbCell( -1,  1)
         }
+        #self.sideRadius = {}
 
     # Private
     def __updateCellInfo(self, i, j):
+        self.cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
         self.k = self.heightMap.getKHeightFromIJ(i, j)
         for dir,cell in self.sideCell.items():
             if(self.heightMap.isValid(i + cell.di, j + cell.dj)):
                 cell.valid = True
                 cell.heightDrop = self.k - self.heightMap.getKHeightFromIJ(i+cell.di, j+cell.dj)
             else:
-                cell.valid = False
+                cell.valid = False        
+        #for side in self.directSides:
+        #    needOffset = (self.sideCell[side].valid and self.sideCell[side].heightDrop > 0)
+        #    self.sideRadius[side] = self.cellInRadius if needOffset else self.cellOutRadius
 
+    def __meshCellFloor(self, mesh, i, j):
+
+        # Construct geometry
+        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
+        radius = self.cellOutRadius
+        face = CellShape.getBasicFloorFace(center, radius)
+
+        # Fill Mesh Structure
+        n = face.normal
+        for v in face.verts:
+            mesh.vertex.add_data3(v.getX(), v.getY(), v.getZ())
+            mesh.normal.addData3(n.getX(), n.getY(), n.getZ())
+            mesh.color.addData4f(1.0, 1.0, 1.0, 1.0)
+        kh = self.heightMap.getKHeightFromIJ(i, j)
+        for tc in face.texCoords:
+            schemeTC = self.textureScheme.getUVFromXY(kh, n, tc.getX(), tc.getY())
+            mesh.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())       
+        mv = mesh.numVerts
+        for t in face.triangles:
+            mesh.tris.addVertices(mv+t.getX(), mv+t.getY(), mv+t.getZ())
+        mesh.numVerts += len(face.verts)
+
+    """
     def __meshCellFloor(self, mesh, i,j):
-        # radius of each sides
-        sideRadius = {}
-        for dir in self.directSides:
-            needOffset = (self.sideCell[dir].valid and self.sideCell[dir].heightDrop > 0)
-            sideRadius[dir] = self.cellInRadius if needOffset else self.cellOutRadius
-
         # vertex pos coords
         numNewVerts = 0
-        cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
         for side in self.diagonalSides:
-            x = cellCenter.getX() + self.cellOutRadius * self.sideCell[side].di
-            y = cellCenter.getY() + self.cellOutRadius * self.sideCell[side].dj
+            x = self.cellCenter.getX() + self.cellOutRadius * self.sideCell[side].di
+            y = self.cellCenter.getY() + self.cellOutRadius * self.sideCell[side].dj
             z = self.heightMap.getZHeightFromIJ(i, j)
             mesh.vertex.add_data3(x, y, z)
             numNewVerts += 1    
@@ -199,8 +254,8 @@ class TerrainCellMesher:
         mesh.numVerts += numNewVerts
 
         # normals
-        faceNormal = LVector3(0,0,1)
-        for x in range(4):
+        faceNormal = LVector3f(0,0,1)
+        for x in range(numNewVerts):
             mesh.normal.addData3(faceNormal.getX(), faceNormal.getY(), faceNormal.getZ())
 
         # vertex tex coords
@@ -214,10 +269,10 @@ class TerrainCellMesher:
         # color
         for x in range(4):
             mesh.color.addData4f(1.0, 1.0, 1.0, 1.0)
-    
-    def meshCell(self, mesh, i,j):
-        self.__updateCellInfo(i,j)
-        self.__meshCellFloor(mesh, i,j)
+ """           
+    def meshCell(self, mesh, i, j):
+        self.__updateCellInfo(i, j)
+        self.__meshCellFloor(mesh, i, j)
 
 
 ###############################################################################
