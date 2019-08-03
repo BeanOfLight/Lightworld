@@ -6,6 +6,7 @@
 from panda3d.core import StackedPerlinNoise2, PNMImage
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
+from panda3d.core import LVector3, LVector2f, LVector2i
 import random
 import math
 
@@ -13,24 +14,90 @@ import math
 # Tiled terrain map in 2x2m tiles
 # Height in discrete increments of 0.5m 
 
+###############################################################################
+# Container for the Terrain Mesh Data
 class TerrainMesh:
     def __init__(self):
         self.format = GeomVertexFormat.getV3n3cpt2()
-        self.vdata = GeomVertexData('square', format, Geom.UHDynamic)
-        self.vertex = GeomVertexWriter(vdata, 'vertex')
-        self.texcoord = GeomVertexWriter(vdata, 'texcoord')
+        self.vdata = GeomVertexData('terrain', self.format, Geom.UHDynamic)
+        self.vertex = GeomVertexWriter(self.vdata, 'vertex')
+        self.texcoord = GeomVertexWriter(self.vdata, 'texcoord')
+        self.color = GeomVertexWriter(self.vdata, 'color')
         self.tris = GeomTriangles(Geom.UHDynamic)  
-        self.normal = GeomVertexWriter(vdata, 'normal')
-        self.numVerts = 0        
+        self.normal = GeomVertexWriter(self.vdata, 'normal')
+        self.numVerts = 0
 
+    def makeGeom(self):
+        terrainGeom = Geom(self.vdata)
+        terrainGeom.addPrimitive(self.tris)
+        return terrainGeom
+
+###############################################################################
+# Generate the terrain image
+class TerrainHeightMap:
+    def __init__(self, imagSize):
+        self.cellSize = 2.0
+        self.heightStep = 0.5
+        self.center = LVector2f(0.0, 0.0)
+        self.size = imagSize
+        self.__terrainImage = PNMImage(self.size, self.size, 1)
+    
+    def generateTerrain(self):
+        #Perlin Noise Base
+        scale = 0.5 * 64 / self.size
+        stackedNoise = StackedPerlinNoise2(scale, scale, 8, 2, 0.5, self.size, 0)
+        self.__terrainImage.perlinNoiseFill(stackedNoise)
+
+        #Make it look a bit more natural
+        for i in range(self.size):
+            for j in range(self.size):
+                g = self.__terrainImage.getGray(i,j)
+                # make between -1 and 1, more land than water
+                g = (g-0.25)/0.75
+                # make mountain more spiky and plains more flat
+                if g>0:
+                    g = g ** 2
+                self.__terrainImage.setGray(i,j,(g+1)/2)
+
+    def isValid(self, i,j):
+        return i >= 0 and i < self.size and j >= 0 and j < self.size
+    
+    def getKHeightFromIJ(self, i, j):
+        return round((self.__terrainImage.getGray(i,j)-0.5)*20)/2
+
+    def getZHeightFromIJ(self, i, j):
+        return self.getKHeightFromIJ(i,j) * self.heightStep 
+
+    def getZHeightFromXY(self, x, y):
+        ijLocation = self.getIJLocationFromXY(LVector2f(x,y))
+        return self.getZHeightFromIJ(ijLocation.getX(), ijLocation.getY())
+
+    def getIJLocationFromXY(self, XYLocation):
+        return LVector2i(
+            round((XYLocation.getX()+self.size)/2),
+            round((XYLocation.getY()+self.size)/2))
+
+    def getXYLocationFromIJ(self, IJLocation):
+        return LVector2f(
+            2*IJLocation.getX()-self.size, 
+            2*IJLocation.getY()-self.size)
+
+
+###############################################################################
+# Worker class meshing one cell of the terrain
 class TerrainCellMesher:
 
     class NeighbCell:
-        def _init__(self):
-            valid = False
-            heightStep = 0.5 #height increments resolution
-            heightDrop = 0 #difference in heigh increments (positive = lower)
-            needOffset = False
+        def __init__(self, di, dj):
+            # Is it inside the terrain
+            self.valid = False
+
+            # Location
+            self.di = di
+            self.dj = dj
+
+            # Properties
+            self.heightDrop = 0 #difference in height increments (positive = lower)
 
     #  (7) xnyp   (6) yp   (5) xpyp
     #           +--------+
@@ -40,35 +107,104 @@ class TerrainCellMesher:
     #           +--------+
     #  (1) xnyn   (2) yn   (3) xpyn
 
-    def __init__(self):
+    def __init__(self, terrainHeightMap):
+        # Parameters      
         self.cellOutRadius = 1.0
         self.cellInRadius = 0.5
         self.mapHeightStep = 0.5
-        self.center = Vector3L(0.0,0.0,0.0)
-        self.sideCells = {
-            "xn"   : NeighbCell(),
-            "xnyn" : NeighbCell(),
-            "yn"   : NeighbCell(),
-            "xpyn" : NeighbCell(),
-            "xp"   : NeighbCell(),
-            "xpyp" : NeighbCell(),
-            "yp"   : NeighbCell(),
-            "xnyp" : NeighbCell()
+        
+        # Source Data
+        self.heightMap = terrainHeightMap
+
+        # Cell Information
+        self.height = 0 #height in map increments
+        self.directSides = [ "xn", "yn", "xp", "yp" ]
+        self.diagonalSides = [ "xnyn", "xpyn", "xpyp", "xnyp" ]
+        self.sideCell = {
+            "xn"   : self.NeighbCell( -1,  0),
+            "xnyn" : self.NeighbCell( -1, -1),
+            "yn"   : self.NeighbCell(  0, -1),
+            "xpyn" : self.NeighbCell(  1, -1),
+            "xp"   : self.NeighbCell(  1,  0),
+            "xpyp" : self.NeighbCell(  1,  1),
+            "yp"   : self.NeighbCell(  0,  1),
+            "xnyp" : self.NeighbCell( -1,  1)
         }
 
-    def meshCell(self, mesher, i,j):
-        __meshCellFloor(self, mesher, i,j)
-        __meshCellSides(self, mesher, i,j)
-    
     # Private
+    def __updateCellInfo(self, i, j):
+        self.k = self.heightMap.getKHeightFromIJ(i, j)
+        for dir,cell in self.sideCell.items():
+            if(self.heightMap.isValid(i + cell.di, j + cell.dj)):
+                cell.valid = True
+                cell.heightDrop = self.k - self.heightMap.getKHeightFromIJ(i+cell.di, j+cell.dj)
+            else:
+                cell.valid = False
+
     def __meshCellFloor(self, mesh, i,j):
+        # radius of each sides
+        sideRadius = {}
+        for dir in self.directSides:
+            needOffset = (self.sideCell[dir].valid and self.sideCell[dir].heightDrop > 0)
+            sideRadius[dir] = self.cellInRadius if needOffset else self.cellOutRadius
+
         # vertex pos coords
+        numNewVerts = 0
+        cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
+        for side in self.diagonalSides:
+            x = cellCenter.getX() + self.cellOutRadius * self.sideCell[side].di
+            y = cellCenter.getY() + self.cellOutRadius * self.sideCell[side].dj
+            z = self.heightMap.getZHeightFromIJ(i, j)
+            mesh.vertex.add_data3(x, y, z)
+            numNewVerts += 1    
+
         # vertex tex coords
+        for side in self.diagonalSides:
+            x = 0.25 + self.sideCell[side].di * 0.25
+            y = 0.25 + self.sideCell[side].dj * 0.25
+            mesh.texcoord.addData2f(x, y)
+        
         # triangles
-        # normal
+        for index in range (1, numNewVerts-1):
+            mesh.tris.addVertices(
+                mesh.numVerts, 
+                mesh.numVerts+index, 
+                mesh.numVerts+index+1)
+        mesh.numVerts += numNewVerts
 
-    def __meshCellSides(self, mesh, i,j):
+        # normals
+        for x in range(4):
+            mesh.normal.addData3(0,0,1)
 
+        # color
+        for x in range(4):
+            mesh.color.addData4f(1.0, 1.0, 1.0, 1.0)
+    
+    def meshCell(self, mesh, i,j):
+        self.__updateCellInfo(i,j)
+        self.__meshCellFloor(mesh, i,j)
+
+
+###############################################################################
+# Worker class generating the terrain mesh
+class TerrainMesher:
+
+    def __init__(self, size):
+        self.size = size
+
+    def meshTerrain(self):
+        self.heightMap = TerrainHeightMap(self.size)
+        self.heightMap.generateTerrain()
+        cellMesher = TerrainCellMesher(self.heightMap)
+
+        terrainMesh = TerrainMesh()
+        for i in range(self.size):
+            for j in range(self.size):
+                cellMesher.meshCell(terrainMesh, i, j)
+
+        return terrainMesh.makeGeom()
+"""  
+##############################################################################################################
 class LightworldTerrain:
     
     def __init__(self, size):
@@ -395,6 +531,6 @@ class LightworldTerrain:
         terrainCube = Geom(vdata)
         terrainCube.addPrimitive(tris)
         return terrainCube
-
+"""
 
 

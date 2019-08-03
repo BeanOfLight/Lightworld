@@ -27,7 +27,7 @@ from panda3d.core import LVector3
 import sys
 import os
 
-from terrain import LightworldTerrain
+from terrain import TerrainMesher
 from avatar import LightworldAvatarControler
 
 # Function to put instructions on the screen.
@@ -52,19 +52,18 @@ class LightworldBasic(ShowBase):
         self.win.setClearColor((0.4, 0.7, 1.0, 1))
 
         # Post the instructions
-        self.title = addTitle(
-            "Lightworld: Explore the map")
+        self.title = addTitle("Lightworld: Explore the map")
         self.inst1 = addInstructions(0.06, "[ESC]: Quit")
         self.inst2 = addInstructions(0.12, "[Left Arrow]: Rotate Left")
         self.inst3 = addInstructions(0.18, "[Right Arrow]: Rotate Right")
         self.inst4 = addInstructions(0.24, "[Up Arrow]: Move Forward")
 
         # Terrain Map
-        terrainSize = 128
-        self.terrain = LightworldTerrain(terrainSize) 
-        terrainMap = self.terrain.generateTerrainGeom()
+        terrainSize = 8
+        self.terrain = TerrainMesher(terrainSize) 
+        terrainMesh = self.terrain.meshTerrain()
         snode = GeomNode('terrainPatch')
-        snode.addGeom(terrainMap)
+        snode.addGeom(terrainMesh)
         map = render.attachNewNode(snode)
         map.setTwoSided(True)
         testTexture = loader.loadTexture("terrainTex.png")
@@ -74,7 +73,7 @@ class LightworldBasic(ShowBase):
         avatarHeight = 1
         cameraDistance = 1
         self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
-        self.avatarControler.setInitialPos(0,0,self.terrain.getHeightAtPos(0,0))
+        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
 
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
@@ -111,7 +110,7 @@ class LightworldBasic(ShowBase):
     
     def moveForward(self):
         target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
-        target.setZ(self.terrain.getHeightAtPos(target.getX(),target.getY()))
+        target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
         self.avatarControler.triggerMoveForward(target)
 
     def turnLeft(self):
