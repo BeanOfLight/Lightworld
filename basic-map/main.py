@@ -1,13 +1,5 @@
 #!/usr/bin/env python
 
-# Author: Kwasi Mensah (kmensah@andrew.cmu.edu)
-# Date: 8/02/2005
-#
-# This is meant to be a simple example of how to draw a cube
-# using Panda's new Geom Interface. Quads arent directly supported
-# since they get broken down to trianlges anyway.
-#
-
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *
@@ -63,14 +55,14 @@ class LightworldBasic(ShowBase):
         self.inst5 = addInstructions(0.30, "[Up Arrow]: Move Forward")
 
         # Terrain Map
-        self.terrainSize = 64
+        self.terrainSize = 128
         self.terrain = TerrainMesher(self.terrainSize) 
         terrainMesh = self.terrain.meshTerrain()
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMesh)
         map = render.attachNewNode(snode)
         map.setTwoSided(True)
-        testTexture = loader.loadTexture("terrainTex.png")
+        testTexture = loader.loadTexture("terrainTex2.png")
         map.setTexture(testTexture)
 
         # Create the avatar

@@ -52,12 +52,25 @@ class TerrainHeightMap:
         for i in range(self.size):
             for j in range(self.size):
                 g = self.__terrainImage.getGray(i,j)
-                # make between -1 and 1, more land than water
+                # make between -0.5 and 1, more land than water
                 g = (g-0.25)/0.75
                 # make mountain more spiky and plains more flat
                 if g>0:
                     g = g ** 2
-                self.__terrainImage.setGray(i,j,(g+1)/2)
+                # return to 0.25 to 1 range
+                g = (g+1)/2
+                self.__terrainImage.setGray(i,j,g)
+        
+        #Make it an island
+        #border = self.size / 8
+        #for i in range(self.size):
+        #    for j in range(self.size):
+        #        distToEdge = min(i, self.size-1-i, j, self.size-1-j)
+        #        if(distToEdge < border):
+        #            g = self.__terrainImage.getGray(i,j)
+        #            g = g * distToEdge / border
+        #            g = max(g, 0.25)
+        #            self.__terrainImage.setGray(i,j,g)
 
     def isValid(self, i,j):
         return i >= 0 and i < self.size and j >= 0 and j < self.size
