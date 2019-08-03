@@ -212,12 +212,33 @@ class CellShape:
             "xpyn" : LVector3f(cx+r, cy-r, cz), 
             "xpyp" : LVector3f(cx+r, cy+r, cz),
             "xnyp" : LVector3f(cx-r, cy+r, cz)}
-        self.cacheCapXNOuterCornerVerts
 
     def __getCapTopOuterCornerVerts(self):
+        c = self.cacheCapTopOuterCornerVerts
         vList = []
-        for dir, vec in self.cacheCapTopOuterCornerVerts.items():
+        for dir, vec in c.items():
             vList.append(vec)
+        return vList
+
+    def __getCapSideOuterCornerVerts(self, zOffset, orientation):
+        c = self.cacheCapTopOuterCornerVerts
+        refList = []
+        refList.append(c["xnyp"])
+        refList.append(c["xnyn"])
+        refList.append(c["xpyn"])
+        refList.append(c["xpyp"])
+        refList.append(c["xnyp"])
+        sides = ["xn", "yn", "xp", "yp"]
+        d = sides.index(orientation)
+
+        zb = LVector3f(0.0, 0.0, zOffset+self.zStep)
+        zt = LVector3f(0.0, 0.0, zOffset)
+
+        vList = []
+        vList.append(refList[d]-zb)
+        vList.append(refList[d+1]-zb)
+        vList.append(refList[d+1]-zt)
+        vList.append(refList[d]-zt)
         return vList
     
     def __getSquareTexCoords():
@@ -259,32 +280,7 @@ class CellShape:
 
     def getBlockSideFace(self, ZOffset, orientation):
         face = CellFace()
-        cx = self.center.getX()
-        cy = self.center.getY()
-        cz = self.center.getZ()
-        r = self.outRadius
-        zo = ZOffset
-        zh = self.zStep
-        if(orientation == "xn"):
-            x = cx-r
-            y = cy
-            z = cz-zo
-            face.verts = [ LVector3f(x, y+r, z-zh), LVector3f(x, y-r, z-zh), LVector3f(x, y-r, z), LVector3f(x, y+r, z)]
-        elif(orientation == "yn"):
-            x = cx
-            y = cy-r
-            z = cz-zo
-            face.verts = [ LVector3f(x-r, y, z-zh), LVector3f(x+r, y, z-zh), LVector3f(x+r, y, z), LVector3f(x-r, y, z)]
-        elif(orientation == "xp"):
-            x = cx+r
-            y = cy
-            z = cz-zo
-            face.verts = [ LVector3f(x, y-r, z-zh), LVector3f(x, y+r, z-zh), LVector3f(x, y+r, z), LVector3f(x, y-r, z)]
-        elif(orientation == "yp"):
-            x = cx
-            y = cy+r
-            z = cz-zo
-            face.verts = [ LVector3f(x+r, y, z-zh), LVector3f(x-r, y, z-zh), LVector3f(x-r, y, z), LVector3f(x+r, y, z)]
+        face.verts = self.__getCapSideOuterCornerVerts(ZOffset, orientation)
         face.normal = CellShape.__getNormal(face.verts)
         texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius)
         face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
