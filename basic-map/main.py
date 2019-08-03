@@ -55,7 +55,7 @@ class LightworldBasic(ShowBase):
         self.inst5 = addInstructions(0.30, "[Up Arrow]: Move Forward")
 
         # Terrain Map
-        self.terrainSize = 128
+        self.terrainSize = 32
         self.terrain = TerrainMesher(self.terrainSize) 
         terrainMesh = self.terrain.meshTerrain()
         snode = GeomNode('terrainPatch')
