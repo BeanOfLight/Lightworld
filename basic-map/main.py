@@ -16,6 +16,7 @@ from panda3d.core import CardMaker
 from panda3d.core import Light, DirectionalLight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
+from panda3d.core import NodePath
 import sys
 import os
 
@@ -49,39 +50,41 @@ class LightworldBasic(ShowBase):
         # Post the instructions
         self.title = addTitle("Lightworld: Explore the map")       
         self.inst1 = addInstructions(0.06, "[ESC]: Quit")
-        self.inst2 = addInstructions(0.12, "[Space Bar]: Toggle Overview")
-        self.inst3 = addInstructions(0.18, "[Left Arrow]: Rotate Left")
-        self.inst4 = addInstructions(0.24, "[Right Arrow]: Rotate Right")
-        self.inst5 = addInstructions(0.30, "[Up Arrow]: Move Forward")
-        self.inst6 = addInstructions(0.36, "[Down Arrow]: Move Backward")
-
-        # Terrain Map
-        self.terrainSize = 64
-        self.terrain = TerrainMesher(self.terrainSize) 
-        terrainMesh = self.terrain.meshTerrain()
-        snode = GeomNode('terrainPatch')
-        snode.addGeom(terrainMesh)
-        map = render.attachNewNode(snode)
-        map.setTwoSided(True)
-        testTexture = loader.loadTexture("terrainTex2.png")
-        map.setTexture(testTexture)
+        self.inst2 = addInstructions(0.12, "[v]: Toggle Overview")
+        self.inst3 = addInstructions(0.18, "[s]: Toggle Terrain Style")
+        self.inst3 = addInstructions(0.24, "[+/-]: Change Size and Recreate")
+        self.inst4 = addInstructions(0.30, "[Space]: Update Terrain")
+        self.inst5 = addInstructions(0.36, "[Left Arrow]: Rotate Left")
+        self.inst6 = addInstructions(0.42, "[Right Arrow]: Rotate Right")
+        self.inst7 = addInstructions(0.48, "[Up Arrow]: Move Forward")
+        self.inst8 = addInstructions(0.54, "[Down Arrow]: Move Backward")
 
         # Create the avatar
         avatarHeight = 1
         cameraDistance = 1
         self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
-        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
 
+        # Initialize terrain and avatar
+        self.texture = loader.loadTexture("terrainTex2.png") 
+        self.terrainSize = 64
+        self.terrainStyle = "taperedStyle"
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
         self.avatar.setScale(0.01)
-        self.avatar.setPos(self.avatarControler.curPos)
-        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
         self.avatar.hide()
+        self.map = NodePath()
+        self.terrain = TerrainMesher() 
+
+        # Generate terrain and positive avatar
+        self.updateTerrain()
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
-        self.accept("space", self.toggleOverview)
+        self.accept("v", self.toggleOverview)
+        self.accept("s", self.toggleTerrainStyle)
+        self.accept("+", self.increaseTerrainSize)
+        self.accept("-", self.decreaseTerrainSize)
+        self.accept("space", self.updateTerrain)
         self.accept("arrow_left", self.turnLeft)
         self.accept("arrow_right", self.turnRight)
         self.accept("arrow_up", self.moveForward)
@@ -102,26 +105,69 @@ class LightworldBasic(ShowBase):
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
     
-    def toggleOverview(self):
-        self.overview = not self.overview
+    def updateCameraPosition(self):
         if self.overview == False:
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
+        else:
+            self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
+            self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
+
+    def updateTerrain(self):
+        self.terrain.generateTerrain(self.terrainSize)
+        self.updateTerrainMesh()
+
+    def updateTerrainMesh(self):
+        self.map.removeNode()
+        terrainMesh = self.terrain.meshTerrain(self.terrainStyle)
+        snode = GeomNode('terrainPatch')
+        snode.addGeom(terrainMesh)
+        self.map = render.attachNewNode(snode)
+        self.map.setTwoSided(True)
+        self.map.setTexture(self.texture)
+
+        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
+        self.avatar.setPos(self.avatarControler.curPos)
+        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+
+        self.updateCameraPosition()
+    
+    def toggleTerrainStyle(self):
+        if(self.terrainStyle == "taperedStyle"):
+            self.terrainStyle = "blockStyle"
+        else:
+            self.terrainStyle = "taperedStyle"
+        self.updateTerrainMesh()
+
+    def increaseTerrainSize(self):
+        self.terrainSize += self.terrainSize
+        self.updateTerrain()
+
+    def decreaseTerrainSize(self):
+        if(self.terrainSize > 1):
+            self.terrainSize -= round(self.terrainSize / 2.0)
+            self.updateTerrain()
+
+    def toggleOverview(self):
+        self.overview = not self.overview
+        if self.overview == False:
             self.camLens.setFocalLength(0.4)
             self.camLens.setNear(0.1)
-            self.inst3.show()
             self.inst4.show()
             self.inst5.show()
             self.inst6.show()
+            self.inst7.show()
+            self.inst8.show()
         else:
             self.disableMouse()
-            self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
-            self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
             self.camLens.setFocalLength(1)
-            self.inst3.hide()
             self.inst4.hide()
             self.inst5.hide()
             self.inst6.hide()
+            self.inst7.hide()
+            self.inst8.hide()
+        
+        self.updateCameraPosition()
 
     def moveForward(self):
         if self.overview == False:

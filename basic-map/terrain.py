@@ -7,6 +7,7 @@ from panda3d.core import StackedPerlinNoise2, PNMImage
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
+from array import *
 import random
 import math
 
@@ -54,18 +55,19 @@ class TerrainHeightMap:
         self.heightStep = 0.5
         self.center = LVector2f(0.0, 0.0)
         self.size = imagSize
-        self.__terrainImage = PNMImage(self.size, self.size, 1)
+        self.__heightMap = [[0 for i in range(self.size)] for j in range(self.size)]
     
     def generateTerrain(self):
         #Perlin Noise Base
         scale = 0.5 * 64 / self.size
         stackedNoise = StackedPerlinNoise2(scale, scale, 8, 2, 0.5, self.size, 0)
-        self.__terrainImage.perlinNoiseFill(stackedNoise)
+        terrainImage = PNMImage(self.size, self.size, 1)
+        terrainImage.perlinNoiseFill(stackedNoise)
 
         #Make it look a bit more natural
         for i in range(self.size):
             for j in range(self.size):
-                g = self.__terrainImage.getGray(i,j)
+                g = terrainImage.getGray(i,j)
                 # make between -0.5 and 1, more land than water
                 g = (g-0.25)/0.75
                 # make mountain more spiky and plains more flat
@@ -73,7 +75,7 @@ class TerrainHeightMap:
                     g = g ** 2
                 # return to 0.25 to 1 range
                 g = (g+1)/2
-                self.__terrainImage.setGray(i,j,g)
+                self.__heightMap[i][j] = g
         
         #Make it an island
         #border = self.size / 8
@@ -91,7 +93,7 @@ class TerrainHeightMap:
     
     # Height in integer increments between -10 and 10
     def getKHeightFromIJ(self, i, j):
-        return round((self.__terrainImage.getGray(i,j)-0.5)*20)
+        return round((self.__heightMap[i][j]-0.5)*20)
 
     def getZHeightFromIJ(self, i, j):
         return self.getKHeightFromIJ(i,j) * self.heightStep 
@@ -192,27 +194,30 @@ class CellShape:
     #           +--------+
     #  (1) xnyn   (2) yn   (3) xpyn
 
-    def __init__(self):
-        pass
+    def __init__(self, center, outRadius, inRadius, zStep):
+        self.outRadius = outRadius
+        self.inRadius = inRadius
+        self.zStep = zStep
+        self.center = center
 
-    def getBlockFloorFace(XYZCellCenter, radius):
+    def getBlockFloorFace(self, XYZCellCenter, radius):
         face = CellFace()
-        cx = XYZCellCenter.getX()
-        cy = XYZCellCenter.getY()
-        cz = XYZCellCenter.getZ()
-        r = radius
+        cx = self.center.getX()
+        cy = self.center.getY()
+        cz = self.center.getZ()
+        r = self.outRadius
         face.verts = [ LVector3f(cx-r, cy-r, cz), LVector3f(cx+r, cy-r, cz), LVector3f(cx+r, cy+r, cz), LVector3f(cx-r, cy+r, cz)]
         face.texCoords = [ LVector2f(0.0, 0.0), LVector2f(1.0, 0.0), LVector2f(1.0, 1.0), LVector2f(0.0, 1.0)]
         face.normal = LVector3f(0.0, 0.0, 1.0)
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face
 
-    def getBlockSideFace(XYZCellCenter, radius, ZOffset, ZHeight, orientation):
+    def getBlockSideFace(self, XYZCellCenter, radius, ZOffset, ZHeight, orientation):
         face = CellFace()
-        cx = XYZCellCenter.getX()
-        cy = XYZCellCenter.getY()
-        cz = XYZCellCenter.getZ()
-        r = radius
+        cx = self.center.getX()
+        cy = self.center.getY()
+        cz = self.center.getZ()
+        r = self.outRadius
         zo = ZOffset
         zh = ZHeight
         if(orientation == "xn"):
@@ -243,19 +248,19 @@ class CellShape:
         face.triangles = [ LVector3i(0, 1, 2), LVector3i(0, 2, 3) ]
         return face 
 
-    def getTapereFloorFace(XYZCellCenter, fullRadius, offsetRadius, taperedSides, taperedCorner):
+    def getTapereFloorFace(self, XYZCellCenter, fullRadius, offsetRadius, taperedSides, taperedCorner):
         face = CellFace()
 
-        cx = XYZCellCenter.getX()
-        cy = XYZCellCenter.getY()
-        cz = XYZCellCenter.getZ()
-        frd = fullRadius
-        ord = offsetRadius
+        cx = self.center.getX()
+        cy = self.center.getY()
+        cz = self.center.getZ()
+        frd = self.outRadius
+        ord = self.inRadius
         r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
         tcx = 0.5
         tcy = 0.5
         tfrd = 0.5
-        tord = 0.5 * offsetRadius / fullRadius
+        tord = 0.5 * self.inRadius / self.outRadius
         tr = {"xn" : tfrd, "yn" : tfrd, "xp": tfrd, "yp" : tfrd }
 
         for side in taperedSides:
@@ -371,6 +376,7 @@ class TerrainCellMesher:
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
         offsetRadius = self.cellInRadius
+        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
         
         # Compute tapered sides
         taperedSide = []
@@ -389,7 +395,7 @@ class TerrainCellMesher:
             taperedCorner.append("xnyp")
 
         # Fill floor cell                
-        face = CellShape.getTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
+        face = cellShape.getTapereFloorFace(center, radius, offsetRadius, taperedSide, taperedCorner)
         face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
         mesh.addFace(self.textureScheme, face)
 
@@ -397,7 +403,7 @@ class TerrainCellMesher:
         for side in self.directSides:
             neighb = self.sideCell[side]
             for drop in range(0, neighb.heightDrop):
-                face = CellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face = cellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
                 face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
                 mesh.addFace(self.textureScheme, face)
     
@@ -405,15 +411,18 @@ class TerrainCellMesher:
         # Construct geometry
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         radius = self.cellOutRadius
+        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
+        
         # Fill floor cell
-        face = CellShape.getBlockFloorFace(center, radius)
+        face = cellShape.getBlockFloorFace(center, radius)
         face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
         mesh.addFace(self.textureScheme, face)
+        
         # Fill sides cell
         for side in self.directSides:
             neighb = self.sideCell[side]
             for drop in range(0, neighb.heightDrop):
-                face = CellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
+                face = cellShape.getBlockSideFace(center, radius, drop * self.mapHeightStep, self.mapHeightStep, side)
                 face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
                 mesh.addFace(self.textureScheme, face)
 
@@ -428,16 +437,17 @@ class TerrainCellMesher:
 # Worker class generating the terrain mesh
 class TerrainMesher:
 
-    def __init__(self, size):
-        self.size = size
-        self.style = "taperedStyle" # "blockStyle"
+    def __init__(self):
+        pass
 
-    def meshTerrain(self):
+    def generateTerrain(self, size):
+        self.size = size
         self.heightMap = TerrainHeightMap(self.size)
         self.heightMap.generateTerrain()
         self.textureScheme = TextureScheme()
-        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme, self.style)
-
+    
+    def meshTerrain(self, style):
+        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme, style)
         terrainMesh = TerrainMesh()
         for i in range(self.size):
             for j in range(self.size):
