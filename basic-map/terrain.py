@@ -270,7 +270,7 @@ class CellShape:
             fan.append(LVector3i(0, v, v+1))
         return fan
 
-    def getBlockFloorFace(self):
+    def __getBlockFloorFace(self):
         face = CellFace()
         face.verts = self.__getCapTopOuterCornerVerts()
         face.texCoords = CellShape.__getSquareTexCoords()
@@ -278,7 +278,7 @@ class CellShape:
         face.triangles = CellShape.__getTriFan(face.verts)
         return face
 
-    def getBlockSideFace(self, ZOffset, orientation):
+    def __getBlockSideFace(self, ZOffset, orientation):
         face = CellFace()
         face.verts = self.__getCapSideOuterCornerVerts(ZOffset, orientation)
         face.normal = CellShape.__getNormal(face.verts)
@@ -286,6 +286,14 @@ class CellShape:
         face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
         face.triangles = CellShape.__getTriFan(face.verts)
         return face 
+
+    def getBlockSideFacesNeeded(self, sidesNeeded):
+        fList = []
+        fList.append(self.__getBlockFloorFace())
+        for side, zOffsetList in sidesNeeded.items():
+            for zOffset in zOffsetList:
+                fList.append(self.__getBlockSideFace(zOffset, side))
+        return fList
 
     def getTapereFloorFace(self, taperedSides, taperedCorner):
         face = CellFace()
@@ -407,7 +415,24 @@ class TerrainCellMesher:
             else:
                 cell.valid = False
                 cell.heightDrop = 0     
-    
+
+    def __meshCellBlockStyle(self, mesh, i, j):
+        # Initialize shape
+        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
+        radius = self.cellOutRadius
+        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
+        
+        # Fill cell
+        sidesNeeded = { "xn" : [], "yn" : [], "xp" : [], "yp" : [] }
+        for side in self.directSides:
+            neighb = self.sideCell[side]
+            for drop in range(0, neighb.heightDrop):
+                sidesNeeded[side].append(drop * self.mapHeightStep)
+        fList = cellShape.getBlockSideFacesNeeded(sidesNeeded) 
+        for f in fList:
+            f.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), f.normal)
+            mesh.addFace(self.textureScheme, f)
+
     def __meshCellTaperedStyle(self, mesh, i, j):
         # Cell properties
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
@@ -437,31 +462,12 @@ class TerrainCellMesher:
         mesh.addFace(self.textureScheme, face)
 
         # Fill sides cell
-        for side in self.directSides:
-            neighb = self.sideCell[side]
-            for drop in range(0, neighb.heightDrop):
-                face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
-                face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
-                mesh.addFace(self.textureScheme, face)
-    
-    def __meshCellBlockStyle(self, mesh, i, j):
-        # Construct geometry
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        radius = self.cellOutRadius
-        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
-        
-        # Fill floor cell
-        face = cellShape.getBlockFloorFace()
-        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
-        mesh.addFace(self.textureScheme, face)
-        
-        # Fill sides cell
-        for side in self.directSides:
-            neighb = self.sideCell[side]
-            for drop in range(0, neighb.heightDrop):
-                face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
-                face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
-                mesh.addFace(self.textureScheme, face)
+        #for side in self.directSides:
+        #    neighb = self.sideCell[side]
+        #    for drop in range(0, neighb.heightDrop):
+        #        face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
+        #        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
+        #        mesh.addFace(self.textureScheme, face)
 
     def meshCell(self, mesh, i, j):
         self.__updateCellInfo(i, j)

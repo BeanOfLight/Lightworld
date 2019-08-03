@@ -197,7 +197,7 @@ class LightworldBasic(ShowBase):
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
         elif(self.avatarControler.turning == True):
-            self.avatarControler.turnByDistance(0.2)
+            self.avatarControler.turnByDistance(0.1)
             self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
