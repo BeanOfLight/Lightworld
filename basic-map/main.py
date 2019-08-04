@@ -21,7 +21,7 @@ import sys
 import os
 
 from terrain import TerrainMesher
-from avatar import LightworldAvatarControler
+from avatar import LightworldAvatarControler 
 
 # Function to put instructions on the screen.
 def addInstructions(pos, msg):
@@ -67,7 +67,7 @@ class LightworldBasic(ShowBase):
         # Initialize terrain and avatar
         self.texture = loader.loadTexture("terrainTex2.png") 
         self.terrainSize = 64
-        self.terrainStyle = "taperedStyle"
+        self.terrainStyle = "blockStyle"
         self.avatar = loader.loadModel("models/smiley")
         self.avatar.reparentTo(render)
         self.avatar.setScale(0.01)
