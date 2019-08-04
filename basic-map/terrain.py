@@ -142,9 +142,79 @@ class TextureScheme:
             return "grass"
         else:
             return "rock"
+###############################################################################
+# Heading utilities
+
+class Heading:
+
+    def getAdjascentHeading(heading):
+        if(heading=="xnyn"):
+            return ["xn","yn"]
+        if(heading=="xpyn"):
+            return ["xp","yn"]
+        if(heading=="xpyp"):
+            return ["xp","yp"]
+        if(heading=="xnyp"):
+            return ["xn","yp"]
+
+    def getAdjascentXHeading(heading):
+        if(heading=="xnyn"):
+            return "xn"
+        if(heading=="xpyn"):
+            return "xp"
+        if(heading=="xpyp"):
+            return "xp"
+        if(heading=="xnyp"):
+            return "xn"
+
+    def getAdjascentYHeading(heading):
+        if(heading=="xnyn"):
+            return "yn"
+        if(heading=="xpyn"):
+            return "yn"
+        if(heading=="xpyp"):
+            return "yp"
+        if(heading=="xnyp"):
+            return "yp"
+
+    def getDirection2i(heading):
+        if(heading=="xn"):
+            return LVector2i(-1, 0)
+        if(heading=="xnyn"):
+            return LVector2i(-1, -1)
+        if(heading=="yn"):
+            return LVector2i(0, -1)
+        if(heading=="xpyn"):
+            return LVector2i(1, -1)
+        if(heading=="xp"):
+            return LVector2i(1, 0)
+        if(heading=="xpyp"):
+            return LVector2i(1, 1)
+        if(heading=="y"):
+            return LVector2i(0, 1)
+        if(heading=="xnyp"):
+            return LVector2i(-1, 1)
+
+    def getDirection3f(heading):
+        if(heading=="xn"):
+            return LVector3f(-1.0, 0.0, 0.0)
+        if(heading=="xnyn"):
+            return LVector3f(-1.0, -1.0, 0.0)
+        if(heading=="yn"):
+            return LVector3f(0.0, -1.0, 0.0)
+        if(heading=="xpyn"):
+            return LVector3f(1.0,-1.0, 0.0)
+        if(heading=="xp"):
+            return LVector3f(1.0, 0.0, 0.0)
+        if(heading=="xpyp"):
+            return LVector3f(1.0, 1.0, 0.0)
+        if(heading=="yp"):
+            return LVector3f(0.0, 1.0, 0.0)
+        if(heading=="xnyp"):
+            return LVector3f(-1.0, 1.0, 0.0)
 
 ###############################################################################
-# Cell shape class
+# Cell face class
 class CellFace:
     def __init__(self):
         self.verts = []
@@ -153,34 +223,157 @@ class CellFace:
         self.normal = []
         self.triangles = []
 
+    def getNormal(listVerts):
+        v1 = listVerts[1] - listVerts[0]
+        v2 = listVerts[2] - listVerts[1]
+        n = v1.cross(v2)
+        return n.normalized()        
+    
+    def getTriFan(listVerts):
+        fan = []
+        nv = len(listVerts)
+        for v in range(1,nv-1):
+            fan.append(LVector3i(0, v, v+1))
+        return fan
+    
+    def getSquareFace(center, normal, up, sideRadius, upRadius, refTexRadius):
+        cx = center.getX()
+        cy = center.getY()
+        cz = center.getZ()
+        sr = sideRadius
+        ur = upRadius
 
+        side = up.cross(normal)
+        face = CellFace()       
+        face.verts = [ 
+            center - side * sideRadius - up * upRadius,
+            center + side * sideRadius - up * upRadius,
+            center + side * sideRadius + up * upRadius, 
+            center - side * sideRadius + up * upRadius] 
+        ratioSide = sideRadius / refTexRadius
+        ratioUp  = upRadius / refTexRadius
+        face.texCoords = [
+            LVector2f(0.0, 0.0), 
+            LVector2f(ratioSide, 0.0), 
+            LVector2f(ratioSide, ratioUp), 
+            LVector2f(0.0, ratioUp)]
+        face.normal = CellFace.getNormal(face.verts)
+        face.triangles = CellFace.getTriFan(face.verts)
+        return face
+
+###############################################################################
+# Cell parameters
+class CenterComponent:
+    def __init__(self, center):
+        self.center = center
+        self.radius = 0.5
+
+class SideComponent:
+    def __init__(self, center, heading):
+        self.center = center
+        self.inRadius = 0.5
+        self.outRadius = 1.0
+        self.heading = heading # in "xn", "yn", "xp", "yp"
+        self.stepHeight = 0.5
+        self.drop = 0
+        self.slope = "" # in "flat", "block", "tapered"
+
+class CornerComponent:
+    def __init__(self, center, heading):
+        self.center = center
+        self.inRadius = 0.5
+        self.outRadius = 1.0
+        self.heading = heading # in "xnyn", "xpyn", "xpyp", "xnyp"
+        self.stepHeight = 0.5
+        self.drop = 0
+        self.slope = "" # in "flat", "block", "taperedX", "taperedY", "foldednormal", "foldedtangential"
+
+class CellInfo:
+    def __init__(self, center):
+        self.center = center
+        self.centerComp = CenterComponent(center)
+        self.sideCompList = [
+            SideComponent(center, "xn"),
+            SideComponent(center, "yn"),
+            SideComponent(center, "yp"),
+            SideComponent(center, "xp")
+        ]
+        self.cornerCompList = [
+            CornerComponent(center, "xnyn"),
+            CornerComponent(center, "xpyn"),
+            CornerComponent(center, "xpyp"),
+            CornerComponent(center, "xnyp")
+        ]   
 ###############################################################################
 # Cell shape class refactored
 class CellShape2:
-    
-    def __init__(self, center, outRadius, inRadius, zStep):
-        self.outRadius = outRadius
-        self.inRadius = inRadius
-        self.zStep = zStep
-        self.center = center
 
-    def getOuterTopFlatFace():
+    def __init__(self):
         pass
 
-    def getSideFlatFace():
-        pass
+    def getFaces(self, cellInfo):
+        fList = []
+        fList.append(CellFace.getSquareFace(
+            cellInfo.center, 
+            LVector3f(0.0, 0.0, 1.0), 
+            LVector3f(0.0, 1.0, 0.0), 
+            cellInfo.centerComp.radius, cellInfo.centerComp.radius, 
+            1.0))
 
-    def getInnerTopFlatFace():
-        pass
+        for sc in cellInfo.sideCompList:
+            headingDir = Heading.getDirection3f(sc.heading)
+            center = cellInfo.center + headingDir * (sc.outRadius+sc.inRadius) / 2.0
+            if(sc.slope == "flat"):
+                fList.append(CellFace.getSquareFace(
+                    center, 
+                    LVector3f(0.0, 0.0, 1.0), 
+                    headingDir,
+                    sc.inRadius,
+                    (sc.outRadius-sc.inRadius) / 2.0,
+                    1.0))                
+            elif(sc.slope == "tapered"):
+                center = center - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
+                normal = (LVector3f(0.0, 0.0, 1.0) + headingDir)
+                normal.normalize()
+                up = (- headingDir + LVector3f(0.0, 0.0, 1.0))
+                up.normalize()
+                fList.append(CellFace.getSquareFace(
+                    center, 
+                    normal, 
+                    up,
+                    sc.inRadius,
+                    (sc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
+                    1.0)) 
 
-    def getSideTopFlatFace(side):
-        pass
-
-    def getCornerTopFlatFace():
-        pass
-
-    
-
+        for cc in cellInfo.cornerCompList:
+            headingDir = Heading.getDirection3f(cc.heading)
+            center = cellInfo.center + headingDir * (cc.outRadius+sc.inRadius) / 2.0
+            if(cc.slope == "flat"):
+                fList.append(CellFace.getSquareFace(
+                    center, 
+                    LVector3f(0.0, 0.0, 1.0), 
+                    LVector3f(0.0, 1.0, 0.0),
+                    (cc.outRadius-sc.inRadius) / 2.0,
+                    (cc.outRadius-sc.inRadius) / 2.0,
+                    1.0))
+            elif(cc.slope == "taperedxn" or cc.slope == "taperedyn" or cc.slope == "taperedxp" or cc.slope == "taperedyp"):
+                taperHeadingDir = Heading.getDirection3f(cc.slope[-2:])
+                center = center - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
+                normal = (LVector3f(0.0, 0.0, 1.0) + taperHeadingDir)
+                normal.normalize()
+                up = (- taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
+                up.normalize()
+                fList.append(CellFace.getSquareFace(
+                    center, 
+                    normal, 
+                    up,
+                    (cc.outRadius-sc.inRadius) / 2.0,
+                    (cc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
+                    1.0))
+            elif(cc.slope == "foldednormal"):
+                pass          
+            # TODO: CONTINUE HERE
+        return fList
 
 ###############################################################################
 # Cell shape class
@@ -295,6 +488,39 @@ class CellShape:
         vList.append(refList[d+1]+pushToOuter2[d])
         vList.append(refList[d]+pushToOuter2[d])
         return vList
+
+    def __getCapCornerTaperedVerts(self, heading, slope, zOffset):
+        cx = self.center.getX()
+        cy = self.center.getY()
+        cz = self.center.getZ()
+        ird = self.inRadius
+        ord = self.outRadius
+        vList = []
+        if(heading=="xnyn"):
+            vList = [
+                LVector3f(cx-ird, cy-ird, cz),
+                LVector3f(cx-ord, cy-ird, cz),
+                LVector3f(cx-ord, cy-ord, cz),
+                LVector3f(cx-ird, cy-ord, cz)]
+        elif(heading=="xpyn"):
+            vList = [
+                LVector3f(cx+ird, cy-ird, cz),
+                LVector3f(cx+ird, cy-ord, cz),
+                LVector3f(cx+ord, cy-ord, cz),
+                LVector3f(cx+ord, cy-ird, cz)]
+        elif(heading=="xpyp"):
+            vList = [
+                LVector3f(cx+ird, cy+ird, cz),
+                LVector3f(cx+ord, cy+ird, cz),
+                LVector3f(cx+ord, cy+ord, cz),
+                LVector3f(cx+ird, cy+ord, cz)]
+        elif(heading=="xnyp"):
+            vList = [
+                LVector3f(cx-ird, cy+ird, cz),
+                LVector3f(cx-ird, cy+ord, cz),
+                LVector3f(cx-ord, cy+ord, cz),
+                LVector3f(cx-ord, cy+ird, cz)]
+        return vList
     
     def __getSquareTexCoords():
         tc = [ 
@@ -311,35 +537,22 @@ class CellShape:
             LVector2f(1.0-xpCrop, 1.0-ypCrop), 
             LVector2f(xnCrop, 1.0-ypCrop) ]
         return tc
-        
-    def __getNormal(listVerts):
-        v1 = listVerts[1] - listVerts[0]
-        v2 = listVerts[2] - listVerts[1]
-        n = v1.cross(v2)
-        return n.normalized()        
-    
-    def __getTriFan(listVerts):
-        fan = []
-        nv = len(listVerts)
-        for v in range(1,nv-1):
-            fan.append(LVector3i(0, v, v+1))
-        return fan
 
     def __getBlockFloorFace(self):
         face = CellFace()
         face.verts = self.__getCapTopOuterCornerVerts()
         face.texCoords = CellShape.__getSquareTexCoords()
-        face.normal = CellShape.__getNormal(face.verts)
-        face.triangles = CellShape.__getTriFan(face.verts)
+        face.normal = CellFace.getNormal(face.verts)
+        face.triangles = CellFace.getTriFan(face.verts)
         return face
 
     def __getBlockSideFace(self, ZOffset, orientation):
         face = CellFace()
         face.verts = self.__getCapSideOuterCornerVerts(ZOffset, orientation)
-        face.normal = CellShape.__getNormal(face.verts)
+        face.normal = CellFace.getNormal(face.verts)
         texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius)
         face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
-        face.triangles = CellShape.__getTriFan(face.verts)
+        face.triangles = CellFace.getTriFan(face.verts)
         return face 
 
     def getBlockFacesNeeded(self, sidesNeeded):
@@ -354,88 +567,39 @@ class CellShape:
         face = CellFace()
         face.verts = self.__getCapTopInnerCornerVerts()
         face.texCoords = CellShape.__getSquareTexCoords()
-        face.normal = CellShape.__getNormal(face.verts)
-        face.triangles = CellShape.__getTriFan(face.verts)
+        face.normal = CellFace.getNormal(face.verts)
+        face.triangles = CellFace.getTriFan(face.verts)
         return face
 
     def __getTaperedSideFloorFace(self, orientation, tapered, zOffset):
         face = CellFace()
         face.verts = self. __getCapSideTaperedVerts(orientation, tapered, zOffset)
-        face.normal = CellShape.__getNormal(face.verts)
+        face.normal = CellFace.getNormal(face.verts)
         texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius) / 1.41
         face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
-        face.triangles = CellShape.__getTriFan(face.verts)
+        face.triangles = CellFace.getTriFan(face.verts)
+        return face
+
+    def __getTaperedCornerFloorFace(self, heading, slope, zOffset):
+        face = CellFace()
+        face.verts = self.__getCapCornerTaperedVerts(heading, slope, zOffset)
+        face.normal = CellFace.getNormal(face.verts)
+        texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius) / 1.41
+        face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, texYnOffset, texYnOffset)
+        face.triangles = CellFace.getTriFan(face.verts)
         return face 
 
-    def getTaperedFacesNeeded(self, sidesNeeded):
+    def getTaperedFacesNeeded(self, sidesNeeded, cornersNeeded):
         fList = []
         fList.append(self.__geTaperedCenterFloorFace()) 
         for side, zOffsetList in sidesNeeded.items():
             fList.append(self.__getTaperedSideFloorFace(side, "flat" if not zOffsetList else "tapered", 0.0))
             for izo in range(1,len(zOffsetList)):
                 fList.append(self.__getTaperedSideFloorFace(side, "vertical", zOffsetList[izo]))
+        for corner, zOffsetList in cornersNeeded.items():
+            fList.append(self.__getTaperedCornerFloorFace(corner, "flat" if not zOffsetList else "other", 0.0))
         return fList
 
-    '''
-    def getTapereFloorFace(self, taperedSides, taperedCorner):
-        face = CellFace()
-
-        cx = self.center.getX()
-        cy = self.center.getY()
-        cz = self.center.getZ()
-        frd = self.outRadius
-        ord = self.inRadius
-        r = {"xn" : frd, "yn" : frd, "xp": frd, "yp" : frd }
-        tcx = 0.5
-        tcy = 0.5
-        tfrd = 0.5
-        tord = 0.5 * self.inRadius / self.outRadius
-        tr = {"xn" : tfrd, "yn" : tfrd, "xp": tfrd, "yp" : tfrd }
-
-        for side in taperedSides:
-            r[side] = ord
-            tr[side] = tord
-
-        if "xnyn" in taperedCorner:
-            face.verts.append(LVector3f(cx-frd, cy-ord, cz))
-            face.texCoords.append(LVector2f(tcx-tfrd, tcy-tord))
-            face.verts.append(LVector3f(cx-ord, cy-frd, cz))
-            face.texCoords.append(LVector2f(tcx-tord, tcy-tfrd))
-        else:
-            face.verts.append(LVector3f(cx-r["xn"], cy-r["yn"], cz))
-            face.texCoords.append(LVector2f(tcx-tr["xn"], tcy-tr["yn"]))  
-
-        if "xpyn" in taperedCorner:
-            face.verts.append(LVector3f(cx+ord, cy-frd, cz)) 
-            face.texCoords.append(LVector2f(tcx+tord, tcy-tfrd))
-            face.verts.append(LVector3f(cx+frd, cy-ord, cz)) 
-            face.texCoords.append(LVector2f(tcx+tfrd, tcy-tord))
-        else:
-            face.verts.append(LVector3f(cx+r["xp"], cy-r["yn"], cz)) 
-            face.texCoords.append(LVector2f(tcx+tr["xp"], tcy-tr["yn"]))
-
-        if "xpyp" in taperedCorner:
-            face.verts.append(LVector3f(cx+frd, cy+ord, cz))
-            face.texCoords.append(LVector2f(tcx+tfrd, tcy+tord))
-            face.verts.append(LVector3f(cx+ord, cy+frd, cz))
-            face.texCoords.append(LVector2f(tcx+tord, tcy+tfrd))
-        else:
-            face.verts.append(LVector3f(cx+r["xp"], cy+r["yp"], cz))
-            face.texCoords.append(LVector2f(tcx+tr["xp"], tcy+tr["yp"]))
-
-        if "xnyp" in taperedCorner:
-            face.verts.append(LVector3f(cx-ord, cy+frd, cz))
-            face.texCoords.append(LVector2f(tcx-tord, tcy+tfrd))
-            face.verts.append(LVector3f(cx-frd, cy+ord, cz))
-            face.texCoords.append(LVector2f(tcx-tfrd, tcy+tord))
-        else:
-            face.verts.append(LVector3f(cx-r["xn"], cy+r["yp"], cz))
-            face.texCoords.append(LVector2f(tcx-tr["xn"], tcy+tr["yp"]))
-
-        face.normal = CellShape.__getNormal(face.verts)
-        face.triangles = CellShape.__getTriFan(face.verts)
-        return face
-    '''
 ###############################################################################
 # Worker class meshing one cell of the terrain
 class TerrainCellMesher:
@@ -474,7 +638,6 @@ class TerrainCellMesher:
         # Cell Information
         self.height = 0 #height in map increments
         self.directSides = [ "xn", "yn", "xp", "yp" ]
-        self.diagonalSides = [ "xnyn", "xpyn", "xpyp", "xnyp" ]
         self.sideCell = {
             "xn"   : self.NeighbCell( -1,  0),
             "xnyn" : self.NeighbCell( -1, -1),
@@ -485,8 +648,39 @@ class TerrainCellMesher:
             "yp"   : self.NeighbCell(  0,  1),
             "xnyp" : self.NeighbCell( -1,  1)
         }
+        self.cellInfo = CellInfo(LVector3f(0.0, 0.0, 0.0))
 
     # Private
+    def __updateCellTapered(self, i, j):
+        self.__updateCellInfo(i, j)
+        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
+        self.cellInfo = CellInfo(center)
+        self.cellInfo.centerComp.radius = self.cellInRadius
+        for sc in self.cellInfo.sideCompList:
+            sc.inRadius = self.cellInRadius
+            sc.outRadius = self.cellOutRadius
+            sc.stepHeight = self.mapHeightStep
+            sc.drop = self.sideCell[sc.heading].heightDrop
+            sc.slope = "flat" if sc.drop <= 0 else "tapered"
+        for cc in self.cellInfo.cornerCompList:
+            cc.inRadius = self.cellInRadius
+            cc.outRadius = self.cellOutRadius
+            cc.stepHeight = self.mapHeightStep
+            cc.drop = self.sideCell[cc.heading].heightDrop
+            adjXHeading = Heading.getAdjascentXHeading(cc.heading)
+            adjYHeading = Heading.getAdjascentYHeading(cc.heading)
+            if(self.sideCell[adjXHeading].heightDrop > 0 and self.sideCell[adjYHeading].heightDrop <= 0):
+                cc.slope = "tapered" + adjXHeading
+            elif(self.sideCell[adjXHeading].heightDrop <= 0 and self.sideCell[adjYHeading].heightDrop > 0):
+                cc.slope = "tapered" + adjYHeading
+            elif(self.sideCell[adjXHeading].heightDrop == 0 and self.sideCell[adjYHeading].heightDrop == 0 and cc.drop > 0):
+                cc.slope = "foldedtangential"
+            elif(self.sideCell[adjXHeading].heightDrop > 0 and self.sideCell[adjYHeading].heightDrop > 0 and cc.drop > 0):
+                cc.slope = "foldednormal"
+            else: #if cc.drop <= 0:
+                cc.slope = "flat"
+
+
     def __updateCellInfo(self, i, j):
         self.cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
         self.k = self.heightMap.getKHeightFromIJ(i, j)
@@ -517,60 +711,18 @@ class TerrainCellMesher:
     def __meshCellTaperedStyle(self, mesh, i, j):
         # Initialize shape
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
-        
-        sidesNeeded = { "xn" : [], "yn" : [], "xp" : [], "yp" : [] }
-        for side in self.directSides:
-            neighb = self.sideCell[side]
-            for drop in range(0, neighb.heightDrop):
-                sidesNeeded[side].append(drop * self.mapHeightStep)
-        fList = cellShape.getTaperedFacesNeeded(sidesNeeded) 
+        cellShape = CellShape2()
+        fList = cellShape.getFaces(self.cellInfo) 
         for f in fList:
             f.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), f.normal)
             mesh.addFace(self.textureScheme, f)    
     
-    '''
-    def __meshCellTaperedStyle(self, mesh, i, j):
-        # Cell properties
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        radius = self.cellOutRadius
-        offsetRadius = self.cellInRadius
-        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
-        
-        # Compute tapered sides
-        taperedSide = []
-        taperedCorner = []
-        sc = self.sideCell
-        for side in self.directSides:
-            if sc[side].heightDrop > 0:
-                taperedSide.append(side)
-        if sc["xn"].heightDrop == 0 and sc["yn"].heightDrop == 0 and sc["xnyn"].heightDrop > 0:
-            taperedCorner.append("xnyn")
-        if sc["xp"].heightDrop == 0 and sc["yn"].heightDrop == 0 and sc["xpyn"].heightDrop > 0:
-            taperedCorner.append("xpyn")
-        if sc["xp"].heightDrop == 0 and sc["yp"].heightDrop == 0 and sc["xpyp"].heightDrop > 0:
-            taperedCorner.append("xpyp")
-        if sc["xn"].heightDrop == 0 and sc["yp"].heightDrop == 0 and sc["xnyp"].heightDrop > 0:
-            taperedCorner.append("xnyp")
-
-        # Fill floor cell                
-        face = cellShape.getTapereFloorFace(taperedSide, taperedCorner)
-        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
-        mesh.addFace(self.textureScheme, face)
-
-        # Fill sides cell
-        #for side in self.directSides:
-        #    neighb = self.sideCell[side]
-        #    for drop in range(0, neighb.heightDrop):
-        #        face = cellShape.getBlockSideFace(drop * self.mapHeightStep, side)
-        #        face.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), face.normal)
-        #        mesh.addFace(self.textureScheme, face)
-    '''
     def meshCell(self, mesh, i, j):
         self.__updateCellInfo(i, j)
         if(self.style == "blockStyle"):
             self.__meshCellBlockStyle(mesh, i, j)
         else:
+            self.__updateCellTapered(i, j)
             self.__meshCellTaperedStyle(mesh, i, j)
 
 ###############################################################################
