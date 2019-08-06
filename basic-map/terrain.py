@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Author: Bastien Pesenti (bpesenti@yahoo.fr)
 # Date: 7/26/2019
 
@@ -10,6 +8,8 @@ from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
 from array import *
 import random
 import math
+
+from navigation import *
 
 # Description
 # Tiled terrain map in 2x2m tiles
@@ -142,94 +142,6 @@ class TextureScheme:
             return "grass"
         else:
             return "rock"
-###############################################################################
-# Heading utilities
-
-class Heading:
-
-    #  (7) xnyp   (6) yp   (5) xpyp
-    #           +--------+
-    #           |        |
-    #    (0) xn |        | (4) xp
-    #           |        |
-    #           +--------+
-    #  (1) xnyn   (2) yn   (3) xpyn
-
-    AllSides = [ "xn", "xnyn", "yn", "xpyn", "xp", "xpyp", "yp", "xnyp" ]
-    DirectSides = [ "xn", "yn", "xp", "yp" ]
-    CornerSides = [ "xnyn", "xpyn", "xpyp", "xnyp" ]
-
-    def getAxis(heading):
-        if(heading=="xn" or heading=="xp"):
-            return "x"
-        elif(heading=="yn" or heading=="yp"):
-            return "y"
-    
-    def getAdjascentHeadings(heading):
-        if(heading=="xnyn"):
-            return ["xn","yn"]
-        elif(heading=="xpyn"):
-            return ["xp","yn"]
-        elif(heading=="xpyp"):
-            return ["xp","yp"]
-        elif(heading=="xnyp"):
-            return ["xn","yp"]
-
-    def getAdjascentXHeading(heading):
-        if(heading=="xnyn"):
-            return "xn"
-        elif(heading=="xpyn"):
-            return "xp"
-        elif(heading=="xpyp"):
-            return "xp"
-        elif(heading=="xnyp"):
-            return "xn"
-
-    def getAdjascentYHeading(heading):
-        if(heading=="xnyn"):
-            return "yn"
-        elif(heading=="xpyn"):
-            return "yn"
-        elif(heading=="xpyp"):
-            return "yp"
-        elif(heading=="xnyp"):
-            return "yp"
-
-    def getDirection2i(heading):
-        if(heading=="xn"):
-            return LVector2i(-1, 0)
-        elif(heading=="xnyn"):
-            return LVector2i(-1, -1)
-        elif(heading=="yn"):
-            return LVector2i(0, -1)
-        elif(heading=="xpyn"):
-            return LVector2i(1, -1)
-        elif(heading=="xp"):
-            return LVector2i(1, 0)
-        elif(heading=="xpyp"):
-            return LVector2i(1, 1)
-        elif(heading=="yp"):
-            return LVector2i(0, 1)
-        elif(heading=="xnyp"):
-            return LVector2i(-1, 1)
-
-    def getDirection3f(heading):
-        if(heading=="xn"):
-            return LVector3f(-1.0, 0.0, 0.0)
-        elif(heading=="xnyn"):
-            return LVector3f(-1.0, -1.0, 0.0)
-        elif(heading=="yn"):
-            return LVector3f(0.0, -1.0, 0.0)
-        elif(heading=="xpyn"):
-            return LVector3f(1.0,-1.0, 0.0)
-        elif(heading=="xp"):
-            return LVector3f(1.0, 0.0, 0.0)
-        elif(heading=="xpyp"):
-            return LVector3f(1.0, 1.0, 0.0)
-        elif(heading=="yp"):
-            return LVector3f(0.0, 1.0, 0.0)
-        elif(heading=="xnyp"):
-            return LVector3f(-1.0, 1.0, 0.0)
 
 ###############################################################################
 # Cell face class

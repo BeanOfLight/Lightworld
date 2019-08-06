@@ -4,6 +4,7 @@
 # Date: 7/28/2019
 
 from panda3d.core import LVector3
+from navigation import *
 
 # Description
 # Playable avatar
@@ -17,12 +18,13 @@ class LightworldAvatarControler:
         
         # Current Position
         self.curPos = LVector3(0,0,0)
-        self.curMoveDir = LVector3(0,1,0)
-        self.curCamPos = self.curPos - self.curMoveDir * self.camDist
+        self.curHeading = "yp"
+        #self.curMoveDir = LVector3(0,1,0)
+        self.curCamPos = self.curPos - self.getMoveDir() * self.camDist
 
         # Target position for next move
         self.targetPos = self.curPos
-        self.targetMoveDir = self.curMoveDir
+        self.targetMoveHeading = self.curHeading
         self.targetCamPos = self.curCamPos
 
         #State
@@ -32,7 +34,17 @@ class LightworldAvatarControler:
     
     def setInitialPos(self, x, y, terrainHeight):
          self.curPos = LVector3(x,y, terrainHeight + self.avatarHeight)
-         self.curCamPos = self.curPos - self.curMoveDir * self.camDist
+         self.curCamPos = self.curPos - self.getMoveDir() * self.camDist
+
+    def getMoveDir(self):
+        return Heading.getDirection3f(self.curHeading)
+    
+    def getTargetForwardCell(self):
+        return self.curPos + Heading.getDirection3f(self.curHeading) * Heading.getNextCellDist(self.curHeading)
+
+    def getTargetBackwardCell(self):
+        backHeading = Heading.getDirection3f(Heading.getOpposite(self.curHeading))
+        return self.curPos + backHeading * Heading.getNextCellDist(self.curHeading)
 
     def triggerMove(self, target):
         if(self.canReceiveCommand):
@@ -52,30 +64,28 @@ class LightworldAvatarControler:
                 dir = (self.targetPos-self.curPos) * (1/distanceToTarget)
                 newPos = self.curPos + dir * distanceToMove
                 self.curPos = newPos
-            self.curCamPos = self.curPos - self.curMoveDir * self.camDist
+            self.curCamPos = self.curPos - self.getMoveDir() * self.camDist
 
     def triggerTurnLeft(self):
         if(self.canReceiveCommand):
             self.turning = True
             self.canReceiveCommand = False
-            self.targetMoveDir = LVector3(
-                -self.curMoveDir.getY(), self.curMoveDir.getX(), self.curMoveDir.getZ())
-            self.targetCamPos = self.curPos - self.targetMoveDir * self.camDist
+            self.targetMoveHeading = Heading.getLeft45(self.curHeading)
+            self.targetCamPos = self.curPos - Heading.getDirection3f(self.targetMoveHeading) * self.camDist
 
     def triggerTurnRight(self):
         if(self.canReceiveCommand):
             self.turning = True
             self.canReceiveCommand = False
-            self.targetMoveDir = LVector3(
-                self.curMoveDir.getY(), -self.curMoveDir.getX(), self.curMoveDir.getZ())
-            self.targetCamPos = self.curPos - self.targetMoveDir * self.camDist
+            self.targetMoveHeading = Heading.getRight45(self.curHeading)
+            self.targetCamPos = self.curPos - Heading.getDirection3f(self.targetMoveHeading) * self.camDist
 
     def turnByDistance(self, distanceToMove):
         if(self.turning):
             distanceToTarget = (self.targetCamPos-self.curCamPos).length()
             if(distanceToTarget<distanceToMove):
                 self.curCamPos = self.targetCamPos
-                self.curMoveDir = self.targetMoveDir
+                self.curHeading = self.targetMoveHeading
                 self.turning = False
                 self.canReceiveCommand = True
             else:

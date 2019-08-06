@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *
@@ -20,6 +18,7 @@ from panda3d.core import NodePath
 import sys
 import os
 
+from navigation import *
 from terrain import TerrainMesher
 from avatar import LightworldAvatarControler 
 
@@ -68,10 +67,6 @@ class LightworldBasic(ShowBase):
         self.texture = loader.loadTexture("terrainTex2.png") 
         self.terrainSize = 64
         self.terrainStyle = "blockStyle"
-        self.avatar = loader.loadModel("models/smiley")
-        self.avatar.reparentTo(render)
-        self.avatar.setScale(0.01)
-        self.avatar.hide()
         self.map = NodePath()
         self.terrain = TerrainMesher() 
 
@@ -107,8 +102,6 @@ class LightworldBasic(ShowBase):
     
     def updateAvatarPosition(self):
         self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
-        self.avatar.setPos(self.avatarControler.curPos)
-        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
     
     def updateCameraPosition(self):
         if self.overview == False:
@@ -171,13 +164,13 @@ class LightworldBasic(ShowBase):
 
     def moveForward(self):
         if self.overview == False:
-            target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
+            target = self.avatarControler.getTargetForwardCell()
             target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
             self.avatarControler.triggerMove(target)
 
     def moveBackward(self):
         if self.overview == False:
-            target = self.avatarControler.curPos - self.avatarControler.curMoveDir * 2.0
+            target = self.avatarControler.getTargetBackwardCell()
             target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
             self.avatarControler.triggerMove(target)
 
@@ -192,13 +185,10 @@ class LightworldBasic(ShowBase):
     def move(self, task):       
         if(self.avatarControler.moving == True):
             self.avatarControler.moveByDistance(0.1)
-            self.avatar.setPos(self.avatarControler.curPos)
-            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
         elif(self.avatarControler.turning == True):
             self.avatarControler.turnByDistance(0.1)
-            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
 
