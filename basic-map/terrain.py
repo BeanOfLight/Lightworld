@@ -222,7 +222,7 @@ class SideComponent:
         self.outRadius = 1.0
         self.heading = heading # in "xn", "yn", "xp", "yp"
         self.stepHeight = 0.5
-        self.drop = 0 # drop of direct neighbor
+        self.rise = 0 # rise of direct neighbor
         self.slope = "" # in "flat", "block", "tapered"
 
 class CornerComponent:
@@ -232,9 +232,9 @@ class CornerComponent:
         self.outRadius = 1.0
         self.heading = heading # in "xnyn", "xpyn", "xpyp", "xnyp"
         self.stepHeight = 0.5
-        self.cdrop = 0 # drop of corner neighbor
-        self.xdrop = 0 # drop of direct neighbor in closest x direction
-        self.ydrop = 0 # drop of direct neighbor in closest y direction
+        self.crise = 0 # rise of corner neighbor
+        self.xrise = 0 # rise of direct neighbor in closest x direction
+        self.yrise = 0 # rise of direct neighbor in closest y direction
         self.slope = "" # in "flat", "block", "taperedX", "taperedY", "foldednormal", "foldedtangential"
 
 class CellInfo:
@@ -281,10 +281,10 @@ class CellShape2:
                     (sc.outRadius-sc.inRadius) / 2.0,
                     1.0))                
             elif(sc.slope == "tapered"):
-                tcenter = center - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
-                tnormal = (LVector3f(0.0, 0.0, 1.0) + headingDir)
+                tcenter = center + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
+                tnormal = (LVector3f(0.0, 0.0, 1.0) - headingDir)
                 tnormal.normalize()
-                tup = (- headingDir + LVector3f(0.0, 0.0, 1.0))
+                tup = (headingDir + LVector3f(0.0, 0.0, 1.0))
                 tup.normalize()
                 fList.append(CellFace.getSquareFace(
                     tcenter, 
@@ -293,10 +293,11 @@ class CellShape2:
                     sc.inRadius,
                     (sc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
                     1.0)) 
-                # Vertical for further drop
-                for lvl in range(1,sc.drop):
-                    vcenter = cellInfo.center + headingDir * sc.outRadius - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * lvl * 3.0 / 2.0
-                    vnormal = headingDir
+                
+                # Vertical for further rise
+                for lvl in range(1,sc.rise):
+                    vcenter = cellInfo.center + headingDir * sc.outRadius + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
+                    vnormal = -headingDir
                     vup = LVector3f(0.0, 0.0, 1.0)
                     fList.append(CellFace.getSquareFace(
                         vcenter, 
@@ -305,7 +306,7 @@ class CellShape2:
                         sc.inRadius,
                         (sc.outRadius-sc.inRadius) / 2.0,
                         1.0))
-
+                
         for cc in cellInfo.cornerCompList:
             headingDir = Heading.getDirection3f(cc.heading)
             center = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0
@@ -317,12 +318,13 @@ class CellShape2:
                     (cc.outRadius-sc.inRadius) / 2.0,
                     (cc.outRadius-sc.inRadius) / 2.0,
                     1.0))
+            
             elif(cc.slope == "taperedxn" or cc.slope == "taperedyn" or cc.slope == "taperedxp" or cc.slope == "taperedyp"):
                 taperHeadingDir = Heading.getDirection3f(cc.slope[-2:])
-                center = center - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
-                normal = (LVector3f(0.0, 0.0, 1.0) + taperHeadingDir)
+                center = center + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
+                normal = (LVector3f(0.0, 0.0, 1.0) - taperHeadingDir)
                 normal.normalize()
-                up = (- taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
+                up = (taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
                 up.normalize()
                 fList.append(CellFace.getSquareFace(
                     center, 
@@ -331,12 +333,13 @@ class CellShape2:
                     (cc.outRadius-sc.inRadius) / 2.0,
                     (cc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
                     1.0))
-                # Need to add vertical for futrher drop
+                
+                # Need to add vertical for futrher rise
                 axis = Heading.getAxis(cc.slope[-2:])
-                drop = cc.xdrop if axis == "x" else cc.ydrop
-                for lvl in range(1,drop):
-                    vcenter = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0 + taperHeadingDir * (cc.outRadius-cc.inRadius) / 2.0 - LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * 3.0 / 2.0
-                    vnormal = taperHeadingDir
+                rise = cc.xrise if axis == "x" else cc.yrise
+                for lvl in range(1,rise):
+                    vcenter = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0 + taperHeadingDir * (cc.outRadius-cc.inRadius) / 2.0 + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
+                    vnormal = -taperHeadingDir
                     vup = LVector3f(0.0, 0.0, 1.0)
                     fList.append(CellFace.getSquareFace(
                         vcenter, 
@@ -348,6 +351,7 @@ class CellShape2:
             elif(cc.slope == "foldednormal"):
                 pass          
             # TODO: CONTINUE HERE
+            
         return fList
 
 ###############################################################################
@@ -399,14 +403,14 @@ class CellShape:
         sides = ["xn", "yn", "xp", "yp"]
         d = sides.index(orientation)
 
-        zb = LVector3f(0.0, 0.0, zOffset+self.zStep)
-        zt = LVector3f(0.0, 0.0, zOffset)
+        zb = LVector3f(0.0, 0.0, zOffset)
+        zt = LVector3f(0.0, 0.0, zOffset +self.zStep)
 
         vList = []
-        vList.append(refList[d]-zb)
-        vList.append(refList[d+1]-zb)
-        vList.append(refList[d+1]-zt)
-        vList.append(refList[d]-zt)
+        vList.append(refList[d+1]+zb)
+        vList.append(refList[d]+zb)
+        vList.append(refList[d]+zt)
+        vList.append(refList[d+1]+zt)
         return vList
 
     # Vertices of tapered inner top face
@@ -472,7 +476,7 @@ class TerrainCellMesher:
             self.dj = dj
 
             # Properties
-            self.heightDrop = 0 #difference in height increments (positive = lower)
+            self.heightRise = 0 #difference in height increments (positive = higher)
 
     def __init__(self, terrainHeightMap, textureScheme, style):
         # Parameters      
@@ -505,29 +509,29 @@ class TerrainCellMesher:
             sc.inRadius = self.cellInRadius
             sc.outRadius = self.cellOutRadius
             sc.stepHeight = self.mapHeightStep
-            sc.drop = self.sideCell[sc.heading].heightDrop
-            sc.slope = "flat" if sc.drop <= 0 else "tapered"
+            sc.rise = self.sideCell[sc.heading].heightRise
+            sc.slope = "flat" if sc.rise <= 0 else "tapered"
         for cc in self.cellInfo.cornerCompList:
             cc.inRadius = self.cellInRadius
             cc.outRadius = self.cellOutRadius
             cc.stepHeight = self.mapHeightStep
-            cc.cdrop = self.sideCell[cc.heading].heightDrop
+            cc.crise = self.sideCell[cc.heading].heightRise
             adjXHeading = Heading.getAdjascentXHeading(cc.heading)
-            cc.xdrop = self.sideCell[adjXHeading].heightDrop
+            cc.xrise = self.sideCell[adjXHeading].heightRise
             adjYHeading = Heading.getAdjascentYHeading(cc.heading)
-            cc.ydrop = self.sideCell[adjYHeading].heightDrop
-            if(cc.xdrop > 0 and cc.ydrop <= 0):
+            cc.yrise = self.sideCell[adjYHeading].heightRise
+            if(cc.xrise > 0 and cc.yrise <= 0):
                 cc.slope = "tapered" + adjXHeading
-            elif(cc.xdrop <= 0 and cc.ydrop > 0):
+            elif(cc.xrise <= 0 and cc.yrise > 0):
                 cc.slope = "tapered" + adjYHeading
-            elif(cc.xdrop == 0 and cc.ydrop == 0 and cc.cdrop > 0):
+            elif(cc.xrise == 0 and cc.yrise == 0 and cc.crise > 0):
                 cc.slope = "foldedtangential"
-            elif(cc.xdrop > 0 and cc.ydrop > 0 and cc.cdrop > 0):
+            elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise > 0):
                 cc.slope = "foldednormal"
-            elif(cc.xdrop > 0 and cc.ydrop > 0 and cc.cdrop == 0):
+            elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise == 0):
                 # this could be either tangential or normal, choosing tangential since scheme favors valleys over hills
                 cc.slope = "foldedtangential"
-            else: #if cc.drop <= 0:
+            else: #if cc.rise <= 0:
                 cc.slope = "flat"
 
 
@@ -537,10 +541,10 @@ class TerrainCellMesher:
         for dir,cell in self.sideCell.items():
             if(self.heightMap.isValid(i + cell.di, j + cell.dj)):
                 cell.valid = True
-                cell.heightDrop = self.k - self.heightMap.getKHeightFromIJ(i+cell.di, j+cell.dj)
+                cell.heightRise = self.heightMap.getKHeightFromIJ(i+cell.di, j+cell.dj) - self.k
             else:
                 cell.valid = False
-                cell.heightDrop = 0     
+                cell.heightRise = 0     
 
     def __meshCellBlockStyle(self, mesh, i, j):
         # Initialize shape
@@ -551,8 +555,8 @@ class TerrainCellMesher:
         sidesNeeded = { "xn" : [], "yn" : [], "xp" : [], "yp" : [] }
         for side in Heading.DirectSides:
             neighb = self.sideCell[side]
-            for drop in range(0, neighb.heightDrop):
-                sidesNeeded[side].append(drop * self.mapHeightStep)
+            for rise in range(0, neighb.heightRise):
+                sidesNeeded[side].append(rise * self.mapHeightStep)
         fList = cellShape.getBlockFacesNeeded(sidesNeeded) 
         for f in fList:
             f.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), f.normal)
