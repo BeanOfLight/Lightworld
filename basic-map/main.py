@@ -8,7 +8,7 @@ from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import CollisionTraverser, CollisionNode
 from panda3d.core import CollisionHandlerQueue, CollisionRay
 from panda3d.core import CollideMask
-from panda3d.core import Texture, GeomNode
+from panda3d.core import Texture, GeomNode, TransparencyAttrib
 from panda3d.core import PerspectiveLens
 from panda3d.core import CardMaker
 from panda3d.core import Light, DirectionalLight, AmbientLight
@@ -23,7 +23,7 @@ import sys
 import os
 
 from navigation import *
-from terrain import TerrainMesher
+from terrainMesh import TerrainMesher
 from avatar import LightworldAvatarControler 
 
 # Function to put instructions on the screen.
@@ -71,8 +71,9 @@ class LightworldBasic(ShowBase):
         self.texture = loader.loadTexture("terrainTex2.png") 
         self.terrainSize = 64
         self.terrainStyle = "taperedStyle"
-        self.map = NodePath()
-        self.terrain = TerrainMesher() 
+        self.terrainNode = NodePath()
+        self.waterNode = NodePath()
+        self.terrainMesher = TerrainMesher() 
 
         # Generate terrain and position avatar
         self.updateTerrain()
@@ -112,7 +113,7 @@ class LightworldBasic(ShowBase):
         dlnp3.setHpr(-100, -50, 0)
         
     def updateAvatarPosition(self):
-        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
+        self.avatarControler.setInitialPos(0,0,self.terrainMesher.heightMap.getZHeightFromXY(0.0,0.0))
     
     def updateCameraPosition(self):
         if self.overview == False:
@@ -123,19 +124,29 @@ class LightworldBasic(ShowBase):
             self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
 
     def updateTerrain(self):
-        self.terrain.generateTerrain(self.terrainSize)
+        self.terrainMesher.generateTerrain(self.terrainSize)
         self.updateTerrainMesh()
+        self.updateWaterMesh()
         self.updateAvatarPosition()
         self.updateCameraPosition()
 
     def updateTerrainMesh(self):
-        self.map.removeNode()
-        terrainMesh = self.terrain.meshTerrain(self.terrainStyle)
+        self.terrainNode.removeNode()
+        terrainMesh = self.terrainMesher.meshTerrain(self.terrainStyle)
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMesh)
-        self.map = render.attachNewNode(snode)
-        self.map.setTexture(self.texture)
+        self.terrainNode = render.attachNewNode(snode)
+        self.terrainNode.setTexture(self.texture)
 
+    def updateWaterMesh(self):
+        self.waterNode.removeNode()
+        waterMesh = self.terrainMesher.meshWater()
+        snode = GeomNode('waterPatch')
+        snode.addGeom(waterMesh)
+        self.waterNode = render.attachNewNode(snode)
+        self.waterNode.setTexture(self.texture)
+        self.waterNode.setTwoSided(True)
+        self.waterNode.setTransparency(TransparencyAttrib.M_alpha)
     
     def toggleTerrainStyle(self):
         if(self.terrainStyle == "taperedStyle"):
@@ -177,13 +188,13 @@ class LightworldBasic(ShowBase):
     def moveForward(self):
         if self.overview == False:
             target = self.avatarControler.getTargetForwardCell()
-            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            target.setZ(self.terrainMesher.heightMap.getZHeightFromXY(target.getX(),target.getY()))
             self.avatarControler.triggerMove(target)
 
     def moveBackward(self):
         if self.overview == False:
             target = self.avatarControler.getTargetBackwardCell()
-            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            target.setZ(self.terrainMesher.heightMap.getZHeightFromXY(target.getX(),target.getY()))
             self.avatarControler.triggerMove(target)
 
     def turnLeft(self):

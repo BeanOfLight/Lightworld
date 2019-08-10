@@ -1,14 +1,14 @@
 # Author: Bastien Pesenti (bpesenti@yahoo.fr)
 # Date: 7/26/2019
 
-from panda3d.core import StackedPerlinNoise2, PNMImage
+
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
-from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
-from array import *
+
 import random
 import math
 
+from terrainMap import *
 from navigation import *
 
 # Description
@@ -16,8 +16,8 @@ from navigation import *
 # Height in discrete increments of 0.5m 
 
 ###############################################################################
-# Container for the Terrain Mesh Data
-class TerrainMesh:
+# Container for the Environment Mesh Data (terrain, water, etc...)
+class EnvironmentMesh:
     def __init__(self):
         self.format = GeomVertexFormat.getV3n3cpt2()
         self.vdata = GeomVertexData('terrain', self.format, Geom.UHDynamic)
@@ -33,7 +33,7 @@ class TerrainMesh:
         for v in face.verts:
             self.vertex.add_data3(v.getX(), v.getY(), v.getZ())
             self.normal.addData3(n.getX(), n.getY(), n.getZ())
-            self.color.addData4f(1.0, 1.0, 1.0, 1.0)
+            self.color.addData4f(1.0, 1.0, 1.0, 0.75)
         for tc in face.texCoords:
             schemeTC = textureScheme.getUVFromXY(face.texMat, tc.getX(), tc.getY())
             self.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())               
@@ -47,76 +47,7 @@ class TerrainMesh:
         terrainGeom.addPrimitive(self.tris)
         return terrainGeom
 
-###############################################################################
-# Generate the terrain image
-class TerrainHeightMap:
-    def __init__(self, imagSize):
-        self.cellSize = 2.0
-        self.heightStep = 0.5
-        self.center = LVector2f(0.0, 0.0)
-        self.size = imagSize
-        self.__heightMap = [[0 for i in range(self.size)] for j in range(self.size)]
-    
-    def generateTerrain(self):
-        #Perlin Noise Base
-        scale = 0.5 * 64 / self.size
-        stackedNoise = StackedPerlinNoise2(scale, scale, 8, 2, 0.5, self.size, 0)
-        terrainImage = PNMImage(self.size, self.size, 1)
-        terrainImage.perlinNoiseFill(stackedNoise)
 
-        #Make it look a bit more natural
-        for i in range(self.size):
-            for j in range(self.size):
-                g = terrainImage.getGray(i,j)
-                # make between -0.5 and 1, more land than water
-                g = (g-0.25)/0.75
-                # make mountain more spiky and plains more flat
-                if g>0:
-                    g = g ** 2
-                # return to 0.25 to 1 range
-                g = (g+1)/2
-                self.__heightMap[i][j] = g
-        
-        #Make it an island
-        #border = self.size / 8
-        #for i in range(self.size):
-        #    for j in range(self.size):
-        #        distToEdge = min(i, self.size-1-i, j, self.size-1-j)
-        #        if(distToEdge < border):
-        #            g = self.__terrainImage.getGray(i,j)
-        #            g = g * distToEdge / border
-        #            g = max(g, 0.25)
-        #            self.__terrainImage.setGray(i,j,g)
-
-    def isValid(self, i,j):
-        return i >= 0 and i < self.size and j >= 0 and j < self.size
-    
-    def getKHeightFromZ(self, z):
-        return round(z/self.heightStep)
-
-    def getZHeightFromK(self, k):
-        return k * self.heightStep
-    
-        # Height in integer increments between -10 and 10
-    def getKHeightFromIJ(self, i, j):
-        return round((self.__heightMap[i][j]-0.5)*20)
-
-    def getZHeightFromIJ(self, i, j):
-        return self.getZHeightFromK(self.getKHeightFromIJ(i,j)) 
-
-    def getZHeightFromXY(self, x, y):
-        ijLocation = self.getIJLocationFromXY(LVector2f(x,y))
-        return self.getZHeightFromIJ(ijLocation.getX(), ijLocation.getY())
-
-    def getIJLocationFromXY(self, XYLocation):
-        return LVector2i(
-            round((XYLocation.getX()+self.size)/2),
-            round((XYLocation.getY()+self.size)/2))
-
-    def getXYLocationFromIJ(self, IJLocation):
-        return LVector2f(
-            2*IJLocation.getX()-self.size, 
-            2*IJLocation.getY()-self.size)
 
 ###############################################################################
 # Class managing texture computation
@@ -141,7 +72,7 @@ class TextureScheme:
         #if(normal.getZ() < 0.2):
         #    return "rock"
         if(zHeight<-0.01):
-            return "water"
+            return "sand"
         elif(zHeight<0.01):
             return "sand"
         elif(zHeight<2.51):
@@ -245,7 +176,6 @@ class CellFace:
             
         return face
 
-
 ###############################################################################
 # Cell parameters
 #
@@ -315,6 +245,16 @@ class CellShape2:
     def __init__(self):
         pass
 
+    def getWaterFaces(self, center):
+        fList = []
+        waterCenter = center
+        fList.append(CellFace.MakeSquareFace(
+            waterCenter, 
+            LVector3f(0.0, 0.0, 1.0), 
+            LVector3f(0.0, 1.0, 0.0), 
+            1.0, 1.0, 1.0))
+        return fList
+    
     def getFaces(self, cellInfo):
         fList = []
         fList.append(CellFace.MakeSquareFace(
@@ -560,7 +500,7 @@ class TerrainCellMesher:
             # Properties
             self.heightRise = 0 #difference in height increments (positive = higher)
 
-    def __init__(self, terrainHeightMap, textureScheme, style):
+    def __init__(self, terrainHeightMap, textureScheme):
         # Parameters      
         self.cellOutRadius = 1.0
         self.cellInRadius = 0.5
@@ -569,7 +509,6 @@ class TerrainCellMesher:
         # Source Data
         self.heightMap = terrainHeightMap
         self.textureScheme = textureScheme
-        self.style = style
 
         # Cell Information
         self.height = 0 #height in map increments
@@ -608,10 +547,7 @@ class TerrainCellMesher:
                 cc.slope = "tapered" + adjYHeading
             elif(cc.xrise == 0 and cc.yrise == 0 and cc.crise > 0):
                 cc.slope = "foldednormal"
-            elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise > 0):
-                cc.slope = "foldednormal"
-            elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise == 0):
-                # this could be either tangential or normal, choosing tangential since scheme favors valleys over hills
+            elif(cc.xrise > 0 and cc.yrise > 0):# and cc.crise > 0):
                 cc.slope = "foldednormal"
             else: #if cc.rise <= 0:
                 cc.slope = "flat"
@@ -651,15 +587,29 @@ class TerrainCellMesher:
         fList = cellShape.getFaces(self.cellInfo) 
         for f in fList:
             f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
-            mesh.addFace(self.textureScheme, f)    
+            mesh.addFace(self.textureScheme, f)
+
+    def __meshWater(self, mesh, i, j):
+        # If water cell, add water surface face
+        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), -0.25)
+        cellShape = CellShape2()
+        if(self.heightMap.hasWater(i,j)):
+            fList = cellShape.getWaterFaces(center)
+            for f in fList:
+                f.texMat = "water"
+                mesh.addFace(self.textureScheme, f)
     
-    def meshCell(self, mesh, i, j):
-        self.__updateCellInfo(i, j)
-        if(self.style == "blockStyle"):
+    def meshCellTerrain(self, mesh, style, i, j):
+        if(style == "blockStyle"):
+            self.__updateCellInfo(i, j)
             self.__meshCellBlockStyle(mesh, i, j)
         else:
             self.__updateCellTapered(i, j)
             self.__meshCellTaperedStyle(mesh, i, j)
+
+    def meshCellWater(self, mesh, i, j):
+        self.__updateCellInfo(i, j)    
+        self.__meshWater(mesh, i, j)
 
 ###############################################################################
 # Worker class generating the terrain mesh
@@ -673,14 +623,20 @@ class TerrainMesher:
         self.heightMap = TerrainHeightMap(self.size)
         self.heightMap.generateTerrain()
         self.textureScheme = TextureScheme()
+        self.cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme)
     
     def meshTerrain(self, style):
-        cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme, style)
-        terrainMesh = TerrainMesh()
+        terrainMesh = EnvironmentMesh()
         for i in range(self.size):
             for j in range(self.size):
-                cellMesher.meshCell(terrainMesh, i, j)
-
+                self.cellMesher.meshCellTerrain(terrainMesh, style, i, j)
         return terrainMesh.makeGeom()
+
+    def meshWater(self):
+        waterMesh = EnvironmentMesh()
+        for i in range(self.size):
+            for j in range(self.size):
+                self.cellMesher.meshCellWater(waterMesh,i,j)
+        return waterMesh.makeGeom()
 
 
