@@ -91,12 +91,18 @@ class TerrainHeightMap:
     def isValid(self, i,j):
         return i >= 0 and i < self.size and j >= 0 and j < self.size
     
-    # Height in integer increments between -10 and 10
+    def getKHeightFromZ(self, z):
+        return round(z/self.heightStep)
+
+    def getZHeightFromK(self, k):
+        return k * self.heightStep
+    
+        # Height in integer increments between -10 and 10
     def getKHeightFromIJ(self, i, j):
         return round((self.__heightMap[i][j]-0.5)*20)
 
     def getZHeightFromIJ(self, i, j):
-        return self.getKHeightFromIJ(i,j) * self.heightStep 
+        return self.getZHeightFromK(self.getKHeightFromIJ(i,j)) 
 
     def getZHeightFromXY(self, x, y):
         ijLocation = self.getIJLocationFromXY(LVector2f(x,y))
@@ -131,14 +137,14 @@ class TextureScheme:
         uv = LVector2f(x,y) * self.scale
         return offset + uv
 
-    def getMaterial(self, kHeight, normal):
+    def getMaterial(self, zHeight, normal):
         #if(normal.getZ() < 0.2):
         #    return "rock"
-        if(kHeight<0):
+        if(zHeight<-0.1):
             return "water"
-        elif(kHeight<1):
+        elif(zHeight<0.1):
             return "sand"
-        elif(kHeight<7):
+        elif(zHeight<2.9):
             return "grass"
         else:
             return "rock"
@@ -153,20 +159,26 @@ class CellFace:
         self.normal = []
         self.triangles = []
 
-    def getNormal(listVerts):
-        v1 = listVerts[1] - listVerts[0]
-        v2 = listVerts[2] - listVerts[1]
+    def updateNormalToFirstThreeVerts(self):
+        v1 = self.verts[1] - self.verts[0]
+        v2 = self.verts[2] - self.verts[1]
         n = v1.cross(v2)
-        return n.normalized()        
+        self.normal = n.normalized() 
     
-    def getTriFan(listVerts):
+    def fanTriangles(self):
         fan = []
-        nv = len(listVerts)
+        nv = len(self.verts)
         for v in range(1,nv-1):
             fan.append(LVector3i(0, v, v+1))
-        return fan
+        self.triangles = fan
+
+    def getVertsCentroid(self):
+        sum = LVector3f(0.0, 0.0, 0.0)
+        for v in self.verts:
+            sum += v
+        return sum * 1 / len(v)
     
-    def getSquareFace(center, normal, up, sideRadius, upRadius, refTexRadius):
+    def MakeSquareFace(center, normal, up, sideRadius, upRadius, refTexRadius):
         cx = center.getX()
         cy = center.getY()
         cz = center.getZ()
@@ -187,8 +199,8 @@ class CellFace:
             LVector2f(ratioSide, 0.0), 
             LVector2f(ratioSide, ratioUp), 
             LVector2f(0.0, ratioUp)]
-        face.normal = CellFace.getNormal(face.verts)
-        face.triangles = CellFace.getTriFan(face.verts)
+        face.updateNormalToFirstThreeVerts()
+        face.fanTriangles()
         return face
 
 ###############################################################################
@@ -262,7 +274,7 @@ class CellShape2:
 
     def getFaces(self, cellInfo):
         fList = []
-        fList.append(CellFace.getSquareFace(
+        fList.append(CellFace.MakeSquareFace(
             cellInfo.center, 
             LVector3f(0.0, 0.0, 1.0), 
             LVector3f(0.0, 1.0, 0.0), 
@@ -273,7 +285,7 @@ class CellShape2:
             headingDir = Heading.getDirection3f(sc.heading)
             center = cellInfo.center + headingDir * (sc.outRadius+sc.inRadius) / 2.0
             if(sc.slope == "flat"):
-                fList.append(CellFace.getSquareFace(
+                fList.append(CellFace.MakeSquareFace(
                     center, 
                     LVector3f(0.0, 0.0, 1.0), 
                     headingDir,
@@ -286,7 +298,7 @@ class CellShape2:
                 tnormal.normalize()
                 tup = (headingDir + LVector3f(0.0, 0.0, 1.0))
                 tup.normalize()
-                fList.append(CellFace.getSquareFace(
+                fList.append(CellFace.MakeSquareFace(
                     tcenter, 
                     tnormal, 
                     tup,
@@ -299,7 +311,7 @@ class CellShape2:
                     vcenter = cellInfo.center + headingDir * sc.outRadius + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
                     vnormal = -headingDir
                     vup = LVector3f(0.0, 0.0, 1.0)
-                    fList.append(CellFace.getSquareFace(
+                    fList.append(CellFace.MakeSquareFace(
                         vcenter, 
                         vnormal, 
                         vup,
@@ -311,7 +323,7 @@ class CellShape2:
             headingDir = Heading.getDirection3f(cc.heading)
             center = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0
             if(cc.slope == "flat"):
-                fList.append(CellFace.getSquareFace(
+                fList.append(CellFace.MakeSquareFace(
                     center, 
                     LVector3f(0.0, 0.0, 1.0), 
                     LVector3f(0.0, 1.0, 0.0),
@@ -326,7 +338,7 @@ class CellShape2:
                 normal.normalize()
                 up = (taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
                 up.normalize()
-                fList.append(CellFace.getSquareFace(
+                fList.append(CellFace.MakeSquareFace(
                     center, 
                     normal, 
                     up,
@@ -341,7 +353,7 @@ class CellShape2:
                     vcenter = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0 + taperHeadingDir * (cc.outRadius-cc.inRadius) / 2.0 + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
                     vnormal = -taperHeadingDir
                     vup = LVector3f(0.0, 0.0, 1.0)
-                    fList.append(CellFace.getSquareFace(
+                    fList.append(CellFace.MakeSquareFace(
                         vcenter, 
                         vnormal, 
                         vup,
@@ -441,17 +453,17 @@ class CellShape:
         face = CellFace()
         face.verts = self.__getCapTopOuterCornerVerts()
         face.texCoords = CellShape.__getSquareTexCoords()
-        face.normal = CellFace.getNormal(face.verts)
-        face.triangles = CellFace.getTriFan(face.verts)
+        face.updateNormalToFirstThreeVerts()
+        face.fanTriangles()
         return face
 
     def __getBlockSideFace(self, ZOffset, orientation):
         face = CellFace()
         face.verts = self.__getCapSideOuterCornerVerts(ZOffset, orientation)
-        face.normal = CellFace.getNormal(face.verts)
+        face.updateNormalToFirstThreeVerts()
         texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius)
         face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
-        face.triangles = CellFace.getTriFan(face.verts)
+        face.fanTriangles()
         return face 
 
     def getBlockFacesNeeded(self, sidesNeeded):
@@ -559,7 +571,7 @@ class TerrainCellMesher:
                 sidesNeeded[side].append(rise * self.mapHeightStep)
         fList = cellShape.getBlockFacesNeeded(sidesNeeded) 
         for f in fList:
-            f.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), f.normal)
+            f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
             mesh.addFace(self.textureScheme, f)
 
     def __meshCellTaperedStyle(self, mesh, i, j):
@@ -568,7 +580,7 @@ class TerrainCellMesher:
         cellShape = CellShape2()
         fList = cellShape.getFaces(self.cellInfo) 
         for f in fList:
-            f.texMat = self.textureScheme.getMaterial(self.heightMap.getKHeightFromIJ(i, j), f.normal)
+            f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
             mesh.addFace(self.textureScheme, f)    
     
     def meshCell(self, mesh, i, j):

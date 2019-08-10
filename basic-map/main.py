@@ -59,7 +59,7 @@ class LightworldBasic(ShowBase):
         self.inst8 = addInstructions(0.54, "[Down Arrow]: Move Backward")
 
         # Create the avatar
-        avatarHeight = 1
+        avatarHeight = 1.6
         cameraDistance = 1
         self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
 
