@@ -15,6 +15,10 @@ from panda3d.core import Light, DirectionalLight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
 from panda3d.core import NodePath
+
+#import direct.directbase.DirectStart
+from panda3d.core import Material
+
 import sys
 import os
 
@@ -66,11 +70,11 @@ class LightworldBasic(ShowBase):
         # Initialize terrain and avatar
         self.texture = loader.loadTexture("terrainTex2.png") 
         self.terrainSize = 64
-        self.terrainStyle = "blockStyle"
+        self.terrainStyle = "taperedStyle"
         self.map = NodePath()
         self.terrain = TerrainMesher() 
 
-        # Generate terrain and positive avatar
+        # Generate terrain and position avatar
         self.updateTerrain()
 
         # Accept the control keys for movement and rotation
@@ -91,15 +95,22 @@ class LightworldBasic(ShowBase):
 
         # Create some lighting
         alight = AmbientLight('alight')
-        alight.setColor((0.4, 0.4, 0.4, 1))
+        alight.setColor((0.2, 0.2, 0.2, 1))
         alnp = render.attachNewNode(alight)
         render.setLight(alnp)
-        dlight = DirectionalLight('dlight')
-        dlight.setColor((0.8, 0.7, 0.6, 1))
-        dlnp = render.attachNewNode(dlight)
-        render.setLight(dlnp)
-        dlnp.setHpr(0,-60,0)
-    
+
+        dlight2 = DirectionalLight('dlight2')
+        dlight2.setColor((0.1, 0.1, 0.1, 1))
+        dlnp2 = render.attachNewNode(dlight2)
+        render.setLight(dlnp2)
+        dlnp2.setHpr(20, -5, 0)
+        
+        dlight3 = DirectionalLight('dlight3')
+        dlight3.setColor((0.6, 0.6, 0.6, 1))
+        dlnp3 = render.attachNewNode(dlight3)
+        render.setLight(dlnp3)
+        dlnp3.setHpr(-100, -50, 0)
+        
     def updateAvatarPosition(self):
         self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
     
@@ -124,6 +135,7 @@ class LightworldBasic(ShowBase):
         snode.addGeom(terrainMesh)
         self.map = render.attachNewNode(snode)
         self.map.setTexture(self.texture)
+
     
     def toggleTerrainStyle(self):
         if(self.terrainStyle == "taperedStyle"):
