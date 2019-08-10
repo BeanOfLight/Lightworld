@@ -140,11 +140,11 @@ class TextureScheme:
     def getMaterial(self, zHeight, normal):
         #if(normal.getZ() < 0.2):
         #    return "rock"
-        if(zHeight<-0.1):
+        if(zHeight<-0.01):
             return "water"
-        elif(zHeight<0.1):
+        elif(zHeight<0.01):
             return "sand"
-        elif(zHeight<2.9):
+        elif(zHeight<2.51):
             return "grass"
         else:
             return "rock"
@@ -176,7 +176,7 @@ class CellFace:
         sum = LVector3f(0.0, 0.0, 0.0)
         for v in self.verts:
             sum += v
-        return sum * 1 / len(v)
+        return sum * 1 / len(self.verts)
     
     def MakeSquareFace(center, normal, up, sideRadius, upRadius, refTexRadius):
         cx = center.getX()
@@ -202,6 +202,49 @@ class CellFace:
         face.updateNormalToFirstThreeVerts()
         face.fanTriangles()
         return face
+
+    def MakeNonPlanarSquare(verts, refTexRadius):
+        ratio = (verts[1]-verts[0]).length()
+
+        faces = []
+
+        face1 = CellFace() 
+        face1.verts = [verts[0], verts[1], verts[2]]
+        face1.texCoords = [
+            LVector2f(0.0, 0.0), 
+            LVector2f(ratio, 0.0), 
+            LVector2f(ratio, ratio)]
+        face1.updateNormalToFirstThreeVerts()
+        face1.fanTriangles()
+            
+        face2 = CellFace() 
+        face2.verts = [verts[0], verts[2], verts[3]]
+        face2.texCoords = [
+            LVector2f(0.0, 0.0), 
+            LVector2f(ratio, ratio), 
+            LVector2f(0.0, ratio)]
+        face2.updateNormalToFirstThreeVerts()
+        face2.fanTriangles()
+
+        faces.append(face1)
+        faces.append(face2)
+
+        return faces
+
+    def MakeTriangle(verts, refTexRadius):
+        ratio = (verts[1]-verts[0]).length()
+
+        face = CellFace() 
+        face.verts = [verts[0], verts[1], verts[2]]
+        face.texCoords = [
+            LVector2f(0.0, 0.0), 
+            LVector2f(ratio, 0.0), 
+            LVector2f(ratio, ratio)]
+        face.updateNormalToFirstThreeVerts()
+        face.fanTriangles()
+            
+        return face
+
 
 ###############################################################################
 # Cell parameters
@@ -247,7 +290,7 @@ class CornerComponent:
         self.crise = 0 # rise of corner neighbor
         self.xrise = 0 # rise of direct neighbor in closest x direction
         self.yrise = 0 # rise of direct neighbor in closest y direction
-        self.slope = "" # in "flat", "block", "taperedX", "taperedY", "foldednormal", "foldedtangential"
+        self.slope = "" # in "flat", "block", "taperedxn", "taperedyn", "taperedxp", "taperedyp", "foldednormal"
 
 class CellInfo:
     def __init__(self, center):
@@ -315,7 +358,7 @@ class CellShape2:
                         vcenter, 
                         vnormal, 
                         vup,
-                        sc.inRadius,
+                        sc.outRadius,
                         (sc.outRadius-sc.inRadius) / 2.0,
                         1.0))
                 
@@ -332,7 +375,9 @@ class CellShape2:
                     1.0))
             
             elif(cc.slope == "taperedxn" or cc.slope == "taperedyn" or cc.slope == "taperedxp" or cc.slope == "taperedyp"):
-                taperHeadingDir = Heading.getDirection3f(cc.slope[-2:])
+                taperHeading = cc.slope[-2:]
+                taperHeadingDir = Heading.getDirection3f(taperHeading)
+                taperAxis = Heading.getAxis(taperHeading)
                 center = center + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
                 normal = (LVector3f(0.0, 0.0, 1.0) - taperHeadingDir)
                 normal.normalize()
@@ -346,23 +391,48 @@ class CellShape2:
                     (cc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
                     1.0))
                 
-                # Need to add vertical for futrher rise
-                axis = Heading.getAxis(cc.slope[-2:])
-                rise = cc.xrise if axis == "x" else cc.yrise
-                for lvl in range(1,rise):
-                    vcenter = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0 + taperHeadingDir * (cc.outRadius-cc.inRadius) / 2.0 + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
-                    vnormal = -taperHeadingDir
-                    vup = LVector3f(0.0, 0.0, 1.0)
-                    fList.append(CellFace.MakeSquareFace(
-                        vcenter, 
-                        vnormal, 
-                        vup,
-                        (cc.outRadius-sc.inRadius) / 2.0,
-                        (sc.outRadius-sc.inRadius) / 2.0,
-                        1.0))
+
+                # Need to fill side triangle in case cell in non-taper dir is lower
+                adjHeadings = Heading.getAdjascentHeadings(cc.heading)
+                for h in adjHeadings:
+                    if not(h == taperHeading):
+                        nonTaperHeading = h
+                nonTaperHeadingDir = Heading.getDirection3f(nonTaperHeading)
+                nonTaperAxis = Heading.getAxis(nonTaperHeading)
+                nonTaperRise = cc.xrise if nonTaperAxis == "x" else cc.yrise
+                xSign = Heading.getDirection3f(cc.heading).getX()
+                ySign = Heading.getDirection3f(cc.heading).getY()
+                if(nonTaperRise<0 or (nonTaperRise == 0 and cc.crise < 0)):
+                    vcorner = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ())
+                    vin = vcorner - taperHeadingDir * (cc.outRadius - cc.inRadius)
+                    vup = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + cc.stepHeight)
+                    
+                    angle = nonTaperHeadingDir.signedAngleDeg(taperHeadingDir, LVector3f(0.0, 0.0, 1.0))
+                    if(angle > 0):
+                        verts1 = [vin, vcorner, vup]
+                        face1 = CellFace.MakeTriangle(verts1, 1.0)
+                        fList.append(face1)
+                    else:
+                        verts2 = [vcorner, vin, vup]
+                        face2 = CellFace.MakeTriangle(verts2, 1.0)
+                        fList.append(face2)
+                
             elif(cc.slope == "foldednormal"):
-                pass          
-            # TODO: CONTINUE HERE
+                xSign = Heading.getDirection3f(cc.heading).getX()
+                ySign = Heading.getDirection3f(cc.heading).getY()
+                vin = LVector3f(cc.center.getX() + cc.inRadius * xSign, cc.center.getY() + cc.inRadius * ySign, cc.center.getZ())
+                maxrise = max(cc.crise, cc.xrise, cc.yrise) 
+                vcout = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + min(maxrise, 1) * cc.stepHeight)
+                vxout = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.inRadius * ySign, cc.center.getZ() + min(cc.xrise, 1) * cc.stepHeight)
+                vyout = LVector3f(cc.center.getX() + cc.inRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + min(cc.yrise, 1) * cc.stepHeight)
+                verts = []
+                if(xSign * ySign > 0):
+                    verts = [vin, vxout, vcout, vyout]
+                else:
+                    verts = [vin, vyout, vcout, vxout]
+                faces = CellFace.MakeNonPlanarSquare(verts, 1.0)
+                fList.append(faces[0])
+                fList.append(faces[1])
             
         return fList
 
@@ -537,12 +607,12 @@ class TerrainCellMesher:
             elif(cc.xrise <= 0 and cc.yrise > 0):
                 cc.slope = "tapered" + adjYHeading
             elif(cc.xrise == 0 and cc.yrise == 0 and cc.crise > 0):
-                cc.slope = "foldedtangential"
+                cc.slope = "foldednormal"
             elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise > 0):
                 cc.slope = "foldednormal"
             elif(cc.xrise > 0 and cc.yrise > 0 and cc.crise == 0):
                 # this could be either tangential or normal, choosing tangential since scheme favors valleys over hills
-                cc.slope = "foldedtangential"
+                cc.slope = "foldednormal"
             else: #if cc.rise <= 0:
                 cc.slope = "flat"
 

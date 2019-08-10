@@ -22,10 +22,10 @@ class Heading:
     DirectSides = [ "xn", "yn", "xp", "yp" ]
     CornerSides = [ "xnyn", "xpyn", "xpyp", "xnyp" ]
 
-    def getAxis(heading):
-        if(heading=="xn" or heading=="xp"):
+    def getAxis(directHeading):
+        if(directHeading=="xn" or directHeading=="xp"):
             return "x"
-        elif(heading=="yn" or heading=="yp"):
+        elif(directHeading=="yn" or directHeading=="yp"):
             return "y"
     
     def getAdjascentHeadings(heading):
@@ -102,11 +102,11 @@ class Heading:
             return LVector3f(0.0, -1.0, 0.0)
         elif(heading=="xpyn"):
             return LVector3f(1.0,-1.0, 0.0)
-        elif(heading=="xp"):
+        elif(heading=="xp" or heading=="x"):
             return LVector3f(1.0, 0.0, 0.0)
         elif(heading=="xpyp"):
             return LVector3f(1.0, 1.0, 0.0)
-        elif(heading=="yp"):
+        elif(heading=="yp" or heading=="y"):
             return LVector3f(0.0, 1.0, 0.0)
         elif(heading=="xnyp"):
             return LVector3f(-1.0, 1.0, 0.0)
