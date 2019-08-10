@@ -51,15 +51,31 @@ class EnvironmentMesh:
 
 ###############################################################################
 # Class managing texture computation
+#
+#     +--------------+
+#     |              |
+#     |              |
+#  ^  |              |
+#  |  |              |
+#  Y  |              |
+#     +--------------+
+#          X -->
+#
+
 class TextureScheme:
 
     def __init__(self):
-        self.scale = 0.4
+        self.scale = 0.2
         self.materialOffset = {
-            "rock"  : LVector2f(0.05, 0.05),
-            "sand"  : LVector2f(0.55, 0.55),
-            "grass" : LVector2f(0.05, 0.55),
-            "water" : LVector2f(0.55, 0.05)
+            "rock"      : LVector2f(0.025, 0.025),
+            "snow"      : LVector2f(0.275, 0.025),
+            "dirt"      : LVector2f(0.525, 0.025),
+            "hillgrass" : LVector2f(0.025, 0.275),
+            "plaingrass": LVector2f(0.275, 0.275),
+            "darksand"  : LVector2f(0.525, 0.275),
+            "lightsand" : LVector2f(0.775, 0.275),
+            "darkwater" : LVector2f(0.025, 0.525),
+            "clearwater": LVector2f(0.275, 0.525)
             }
     
     # Get UV coordinates from the right material, from xy in [0.0,1.0] range
@@ -71,14 +87,18 @@ class TextureScheme:
     def getMaterial(self, zHeight, normal):
         #if(normal.getZ() < 0.2):
         #    return "rock"
+        if(zHeight<-1.01):
+            return "darksand"
         if(zHeight<-0.01):
-            return "sand"
+            return "lightsand"
         elif(zHeight<0.01):
-            return "sand"
-        elif(zHeight<2.51):
-            return "grass"
-        else:
+            return "plaingrass"
+        elif(zHeight<2.01):
+            return "hillgrass"
+        elif(zHeight<5.01):
             return "rock"
+        else:
+            return "snow"
 
 ###############################################################################
 # Cell face class
@@ -596,7 +616,7 @@ class TerrainCellMesher:
         if(self.heightMap.hasWater(i,j)):
             fList = cellShape.getWaterFaces(center)
             for f in fList:
-                f.texMat = "water"
+                f.texMat = "clearwater"
                 mesh.addFace(self.textureScheme, f)
     
     def meshCellTerrain(self, mesh, style, i, j):
