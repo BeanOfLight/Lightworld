@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-
-# Author: Kwasi Mensah (kmensah@andrew.cmu.edu)
-# Date: 8/02/2005
-#
-# This is meant to be a simple example of how to draw a cube
-# using Panda's new Geom Interface. Quads arent directly supported
-# since they get broken down to trianlges anyway.
-#
-
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *
@@ -24,11 +14,13 @@ from panda3d.core import CardMaker
 from panda3d.core import Light, DirectionalLight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
+from panda3d.core import NodePath
 import sys
 import os
 
-from terrain import LightworldTerrain
-from avatar import LightworldAvatarControler
+from navigation import *
+from terrain import TerrainMesher
+from avatar import LightworldAvatarControler 
 
 # Function to put instructions on the screen.
 def addInstructions(pos, msg):
@@ -45,6 +37,9 @@ def addTitle(text):
 # Game Class
 class LightworldBasic(ShowBase):
     def __init__(self):
+        #Interactive or overview mode
+        self.overview = True
+
         # Set up the window, camera, etc.
         ShowBase.__init__(self)
 
@@ -52,51 +47,47 @@ class LightworldBasic(ShowBase):
         self.win.setClearColor((0.4, 0.7, 1.0, 1))
 
         # Post the instructions
-        self.title = addTitle(
-            "Lightworld: Explore the map")
+        self.title = addTitle("Lightworld: Explore the map")       
         self.inst1 = addInstructions(0.06, "[ESC]: Quit")
-        self.inst2 = addInstructions(0.12, "[Left Arrow]: Rotate Left")
-        self.inst3 = addInstructions(0.18, "[Right Arrow]: Rotate Right")
-        self.inst4 = addInstructions(0.24, "[Up Arrow]: Move Forward")
-
-        # Terrain Map
-        terrainSize = 128
-        self.terrain = LightworldTerrain(terrainSize) 
-        terrainMap = self.terrain.generateTerrainGeom()
-        snode = GeomNode('terrainPatch')
-        snode.addGeom(terrainMap)
-        map = render.attachNewNode(snode)
-        map.setTwoSided(True)
-        testTexture = loader.loadTexture("terrainTex.png")
-        map.setTexture(testTexture)
+        self.inst2 = addInstructions(0.12, "[v]: Toggle Overview")
+        self.inst3 = addInstructions(0.18, "[s]: Toggle Terrain Style")
+        self.inst3 = addInstructions(0.24, "[+/-]: Change Size and Recreate")
+        self.inst4 = addInstructions(0.30, "[Space]: Update Terrain")
+        self.inst5 = addInstructions(0.36, "[Left Arrow]: Rotate Left")
+        self.inst6 = addInstructions(0.42, "[Right Arrow]: Rotate Right")
+        self.inst7 = addInstructions(0.48, "[Up Arrow]: Move Forward")
+        self.inst8 = addInstructions(0.54, "[Down Arrow]: Move Backward")
 
         # Create the avatar
-        avatarHeight = 1
+        avatarHeight = 1.6
         cameraDistance = 1
         self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
-        self.avatarControler.setInitialPos(0,0,self.terrain.getHeightAtPos(0,0))
 
-        self.avatar = loader.loadModel("models/smiley")
-        self.avatar.reparentTo(render)
-        self.avatar.setScale(0.01)
-        self.avatar.setPos(self.avatarControler.curPos)
-        self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
-        self.avatar.hide()
+        # Initialize terrain and avatar
+        self.texture = loader.loadTexture("terrainTex2.png") 
+        self.terrainSize = 64
+        self.terrainStyle = "blockStyle"
+        self.map = NodePath()
+        self.terrain = TerrainMesher() 
+
+        # Generate terrain and positive avatar
+        self.updateTerrain()
 
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
+        self.accept("v", self.toggleOverview)
+        self.accept("s", self.toggleTerrainStyle)
+        self.accept("+", self.increaseTerrainSize)
+        self.accept("-", self.decreaseTerrainSize)
+        self.accept("space", self.updateTerrain)
         self.accept("arrow_left", self.turnLeft)
         self.accept("arrow_right", self.turnRight)
         self.accept("arrow_up", self.moveForward)
-
+        self.accept("arrow_down", self.moveBackward)
         taskMgr.add(self.move, "moveTask")
 
-        # Set up the camera
         self.disableMouse()
-        self.camera.setPos(self.avatarControler.curCamPos)
-        self.camera.lookAt(self.avatarControler.curPos)
-        self.camLens.setFocalLength(0.4)
-        self.camLens.setNear(0.1)
+        self.toggleOverview()
 
         # Create some lighting
         alight = AmbientLight('alight')
@@ -109,27 +100,95 @@ class LightworldBasic(ShowBase):
         render.setLight(dlnp)
         dlnp.setHpr(0,-60,0)
     
+    def updateAvatarPosition(self):
+        self.avatarControler.setInitialPos(0,0,self.terrain.heightMap.getZHeightFromXY(0.0,0.0))
+    
+    def updateCameraPosition(self):
+        if self.overview == False:
+            self.camera.setPos(self.avatarControler.curCamPos)
+            self.camera.lookAt(self.avatarControler.curPos)
+        else:
+            self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
+            self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
+
+    def updateTerrain(self):
+        self.terrain.generateTerrain(self.terrainSize)
+        self.updateTerrainMesh()
+        self.updateAvatarPosition()
+        self.updateCameraPosition()
+
+    def updateTerrainMesh(self):
+        self.map.removeNode()
+        terrainMesh = self.terrain.meshTerrain(self.terrainStyle)
+        snode = GeomNode('terrainPatch')
+        snode.addGeom(terrainMesh)
+        self.map = render.attachNewNode(snode)
+        self.map.setTexture(self.texture)
+    
+    def toggleTerrainStyle(self):
+        if(self.terrainStyle == "taperedStyle"):
+            self.terrainStyle = "blockStyle"
+        else:
+            self.terrainStyle = "taperedStyle"
+        self.updateTerrainMesh()
+
+    def increaseTerrainSize(self):
+        self.terrainSize += self.terrainSize
+        self.updateTerrain()
+
+    def decreaseTerrainSize(self):
+        if(self.terrainSize > 1):
+            self.terrainSize -= round(self.terrainSize / 2.0)
+            self.updateTerrain()
+
+    def toggleOverview(self):
+        self.overview = not self.overview
+        if self.overview == False:
+            self.camLens.setFocalLength(0.4)
+            self.camLens.setNear(0.1)
+            self.inst4.show()
+            self.inst5.show()
+            self.inst6.show()
+            self.inst7.show()
+            self.inst8.show()
+        else:
+            self.disableMouse()
+            self.camLens.setFocalLength(1)
+            self.inst4.hide()
+            self.inst5.hide()
+            self.inst6.hide()
+            self.inst7.hide()
+            self.inst8.hide()
+        
+        self.updateCameraPosition()
+
     def moveForward(self):
-        target = self.avatarControler.curPos + self.avatarControler.curMoveDir * 2.0
-        target.setZ(self.terrain.getHeightAtPos(target.getX(),target.getY()))
-        self.avatarControler.triggerMoveForward(target)
+        if self.overview == False:
+            target = self.avatarControler.getTargetForwardCell()
+            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            self.avatarControler.triggerMove(target)
+
+    def moveBackward(self):
+        if self.overview == False:
+            target = self.avatarControler.getTargetBackwardCell()
+            target.setZ(self.terrain.heightMap.getZHeightFromXY(target.getX(),target.getY()))
+            self.avatarControler.triggerMove(target)
 
     def turnLeft(self):
-        self.avatarControler.triggerTurnLeft()
+        if self.overview == False:
+            self.avatarControler.triggerTurnLeft()
     
     def turnRight(self):
-        self.avatarControler.triggerTurnRight()
+        if self.overview == False:
+            self.avatarControler.triggerTurnRight()
 
     def move(self, task):       
         if(self.avatarControler.moving == True):
             self.avatarControler.moveByDistance(0.1)
-            self.avatar.setPos(self.avatarControler.curPos)
-            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
         elif(self.avatarControler.turning == True):
-            self.avatarControler.turnByDistance(0.2)
-            self.avatar.lookAt(self.avatarControler.curPos-self.avatarControler.curMoveDir)
+            self.avatarControler.turnByDistance(0.1)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
 
