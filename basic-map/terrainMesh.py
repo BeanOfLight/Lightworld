@@ -135,7 +135,7 @@ class CellFace:
         return face
 
     def MakeNonPlanarSquare(verts, refTexRadius):
-        ratio = (verts[1]-verts[0]).length()
+        ratio = (verts[1]-verts[0]).length() / math.sqrt(2.0) / refTexRadius
 
         faces = []
 
@@ -163,7 +163,7 @@ class CellFace:
         return faces
 
     def MakeTriangle(verts, refTexRadius):
-        ratio = (verts[1]-verts[0]).length()
+        ratio = (verts[1]-verts[0]).length() / math.sqrt(2.0) / refTexRadius
 
         face = CellFace() 
         face.verts = [verts[0], verts[1], verts[2]]
