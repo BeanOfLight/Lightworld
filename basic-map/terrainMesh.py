@@ -1,3 +1,6 @@
+#########################################################################################
+# LightWorld
+# terrainMesh.py
 # Author: Bastien Pesenti (bpesenti@yahoo.fr)
 # Date: 7/26/2019
 
@@ -33,7 +36,7 @@ class EnvironmentMesh:
         for v in face.verts:
             self.vertex.add_data3(v.getX(), v.getY(), v.getZ())
             self.normal.addData3(n.getX(), n.getY(), n.getZ())
-            self.color.addData4f(1.0, 1.0, 1.0, 0.75)
+            self.color.addData4f(1.0, 1.0, 1.0, 0.8)
         for tc in face.texCoords:
             schemeTC = textureScheme.getUVFromXY(face.texMat, tc.getX(), tc.getY())
             self.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())               
@@ -43,9 +46,9 @@ class EnvironmentMesh:
         self.numVerts += len(face.verts)
 
     def makeGeom(self):
-        terrainGeom = Geom(self.vdata)
-        terrainGeom.addPrimitive(self.tris)
-        return terrainGeom
+        geom = Geom(self.vdata)
+        geom.addPrimitive(self.tris)
+        return geom
 
 
 
@@ -85,14 +88,15 @@ class TextureScheme:
         return offset + uv
 
     def getMaterial(self, zHeight, normal):
-        #if(normal.getZ() < 0.2):
-        #    return "rock"
+
         if(zHeight<-1.01):
             return "darksand"
         if(zHeight<-0.01):
             return "lightsand"
         elif(zHeight<0.01):
             return "plaingrass"
+        elif(normal.getZ() < 0.2):
+           return "rock"
         elif(zHeight<2.01):
             return "hillgrass"
         elif(zHeight<5.01):

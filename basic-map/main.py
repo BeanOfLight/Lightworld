@@ -1,3 +1,9 @@
+#########################################################################################
+# LightWorld
+# main.py
+# Author: Bastien Pesenti (bpesenti@yahoo.fr)
+# Date: 7/26/2019
+
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *
@@ -15,6 +21,8 @@ from panda3d.core import Light, DirectionalLight, AmbientLight
 from panda3d.core import TextNode
 from panda3d.core import LVector3
 from panda3d.core import NodePath
+from panda3d.core import Fog
+
 
 #import direct.directbase.DirectStart
 from panda3d.core import Material
@@ -48,8 +56,10 @@ class LightworldBasic(ShowBase):
         ShowBase.__init__(self)
 
         # Set the background color to blue
-        self.win.setClearColor((0.4, 0.7, 1.0, 1))
-
+        self.skyBackgroundColor = (0.4, 0.7, 1.0)
+        self.seaBackgroundColor = (0.16, 0.72, 0.87)
+        self.setBackgroundColor(*self.skyBackgroundColor)
+               
         # Post the instructions
         self.title = addTitle("Lightworld: Explore the map")       
         self.inst1 = addInstructions(0.06, "[ESC]: Quit")
@@ -66,6 +76,13 @@ class LightworldBasic(ShowBase):
         avatarHeight = 1.6
         cameraDistance = 1
         self.avatarControler = LightworldAvatarControler(avatarHeight, cameraDistance)
+        
+        self.linfog = Fog("A linear-mode Fog node")
+        self.linfog.setColor(0.16, 0.72, 0.87)
+        self.linfog.setLinearRange(0,18)
+        self.linfog.setLinearFallback(45,6,18)
+        self.camera.attachNewNode(self.linfog)
+        render.setFog(self.linfog)
 
         # Initialize terrain and avatar
         self.texture = loader.loadTexture("terrainTex2.png") 
@@ -119,9 +136,18 @@ class LightworldBasic(ShowBase):
         if self.overview == False:
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
+            if(not render.hasFog() and self.camera.getPos().getZ() < -0.25):
+                render.setFog(self.linfog)
+                self.setBackgroundColor(*self.seaBackgroundColor)
+            elif(render.hasFog() and self.camera.getPos().getZ() > -0.25):
+                render.clearFog()
+                self.setBackgroundColor(*self.skyBackgroundColor)
         else:
             self.camera.setPos(LVector3(-2.2 * self.terrainSize, -1.7 * self.terrainSize, self.terrainSize) )
             self.camera.lookAt(LVector3(-0.1 * self.terrainSize, 0.0, -0.30 * self.terrainSize))
+            if(render.hasFog()):
+                render.clearFog()
+                self.setBackgroundColor(*self.skyBackgroundColor)
 
     def updateTerrain(self):
         self.terrainMesher.generateTerrain(self.terrainSize)
@@ -168,7 +194,7 @@ class LightworldBasic(ShowBase):
         self.overview = not self.overview
         if self.overview == False:
             self.camLens.setFocalLength(0.4)
-            self.camLens.setNear(0.1)
+            self.camLens.setNear(0.1)          
             self.inst4.show()
             self.inst5.show()
             self.inst6.show()
@@ -182,7 +208,7 @@ class LightworldBasic(ShowBase):
             self.inst6.hide()
             self.inst7.hide()
             self.inst8.hide()
-        
+            
         self.updateCameraPosition()
 
     def moveForward(self):
@@ -214,7 +240,13 @@ class LightworldBasic(ShowBase):
             self.avatarControler.turnByDistance(0.1)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
-
+        if(self.overview == False):
+            if(not render.hasFog() and self.camera.getPos().getZ() < -0.25):
+                render.setFog(self.linfog)
+                self.setBackgroundColor(*self.seaBackgroundColor)
+            elif(render.hasFog() and self.camera.getPos().getZ() > -0.25):
+                render.clearFog()
+                self.setBackgroundColor(*self.skyBackgroundColor)
         return task.cont
 
 demo = LightworldBasic()

@@ -1,5 +1,12 @@
+#########################################################################################
+# LightWorld
+# terrainMap.py
+# Author: Bastien Pesenti (bpesenti@yahoo.fr)
+# Date: 8/10/2019
+
 from panda3d.core import StackedPerlinNoise2, PNMImage
 from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
+import math
 from array import *
 
 ###############################################################################
@@ -34,13 +41,13 @@ class TerrainHeightMap:
                 terrainImage.setGray(i,j,g)
         
         #Make it an island
-        border = self.size / 8
+        border = 2 * self.size / 8
         for i in range(self.size):
             for j in range(self.size):
                 distToEdge = min(i, self.size-1-i, j, self.size-1-j)
                 if(distToEdge < border):
                     g = terrainImage.getGray(i,j)
-                    g = g * distToEdge / border
+                    g = g * math.sqrt(distToEdge / border)
                     g = max(g, 0.25)
                     terrainImage.setGray(i,j,g)
 
