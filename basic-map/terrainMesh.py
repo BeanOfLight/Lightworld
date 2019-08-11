@@ -55,15 +55,12 @@ class EnvironmentMesh:
 ###############################################################################
 # Class managing texture computation
 #
-#     +--------------+
-#     |              |
-#     |              |
-#  ^  |              |
-#  |  |              |
-#  Y  |              |
-#     +--------------+
-#          X -->
-#
+#     +---------+
+#  ^  |         |
+#  |  |         |
+#  Y  |         |
+#     +---------+
+#        X -->
 
 class TextureScheme:
 
@@ -246,7 +243,7 @@ class CornerComponent:
         self.yrise = 0 # rise of direct neighbor in closest y direction
         self.slope = "" # in "flat", "block", "taperedxn", "taperedyn", "taperedxp", "taperedyp", "foldednormal"
 
-class CellInfo:
+class CellMeshInfo:
     def __init__(self, center):
         self.center = center
         self.centerComp = CenterComponent(center)
@@ -401,114 +398,6 @@ class CellShape2:
         return fList
 
 ###############################################################################
-# Cell shape class
-class CellShape:
-
-    def __init__(self, center, outRadius, inRadius, zStep):
-        self.outRadius = outRadius
-        self.inRadius = inRadius
-        self.zStep = zStep
-        self.center = center
-        self.__cacheShape()
-
-    def __cacheShape(self):
-        cx = self.center.getX()
-        cy = self.center.getY()
-        cz = self.center.getZ()
-        bz = cz-self.zStep
-        ord = self.outRadius
-        self.cacheCapTopOuterCornerVerts = {
-            "xnyn" : LVector3f(cx-ord, cy-ord, cz),
-            "xpyn" : LVector3f(cx+ord, cy-ord, cz), 
-            "xpyp" : LVector3f(cx+ord, cy+ord, cz),
-            "xnyp" : LVector3f(cx-ord, cy+ord, cz)}
-        ird = self.inRadius
-        self.cacheCapTopInnerCornerVerts = {
-            "xnyn" : LVector3f(cx-ird, cy-ird, cz),
-            "xpyn" : LVector3f(cx+ird, cy-ird, cz), 
-            "xpyp" : LVector3f(cx+ird, cy+ird, cz),
-            "xnyp" : LVector3f(cx-ird, cy+ird, cz)}
-
-    # Vertices of the top block face
-    def __getCapTopOuterCornerVerts(self):
-        c = self.cacheCapTopOuterCornerVerts
-        vList = []
-        for dir, vec in c.items():
-            vList.append(vec)
-        return vList
-
-    # Vertices of the side block face
-    def __getCapSideOuterCornerVerts(self, zOffset, orientation):
-        c = self.cacheCapTopOuterCornerVerts
-        refList = []
-        refList.append(c["xnyp"])
-        refList.append(c["xnyn"])
-        refList.append(c["xpyn"])
-        refList.append(c["xpyp"])
-        refList.append(c["xnyp"])
-        sides = ["xn", "yn", "xp", "yp"]
-        d = sides.index(orientation)
-
-        zb = LVector3f(0.0, 0.0, zOffset)
-        zt = LVector3f(0.0, 0.0, zOffset +self.zStep)
-
-        vList = []
-        vList.append(refList[d+1]+zb)
-        vList.append(refList[d]+zb)
-        vList.append(refList[d]+zt)
-        vList.append(refList[d+1]+zt)
-        return vList
-
-    # Vertices of tapered inner top face
-    def __getCapTopInnerCornerVerts(self):
-        c = self.cacheCapTopInnerCornerVerts
-        vList = []
-        for dir, vec in c.items():
-            vList.append(vec)
-        return vList
-  
-    def __getSquareTexCoords():
-        tc = [ 
-            LVector2f(0.0, 0.0), 
-            LVector2f(1.0, 0.0), 
-            LVector2f(1.0, 1.0), 
-            LVector2f(0.0, 1.0)]
-        return tc
-
-    def __getCropSquareTexCoords(xnCrop, ynCrop, xpCrop, ypCrop):
-        tc = [ 
-            LVector2f(xnCrop, ynCrop), 
-            LVector2f(1.0-xpCrop, ynCrop), 
-            LVector2f(1.0-xpCrop, 1.0-ypCrop), 
-            LVector2f(xnCrop, 1.0-ypCrop) ]
-        return tc
-
-    def __getBlockFloorFace(self):
-        face = CellFace()
-        face.verts = self.__getCapTopOuterCornerVerts()
-        face.texCoords = CellShape.__getSquareTexCoords()
-        face.updateNormalToFirstThreeVerts()
-        face.fanTriangles()
-        return face
-
-    def __getBlockSideFace(self, ZOffset, orientation):
-        face = CellFace()
-        face.verts = self.__getCapSideOuterCornerVerts(ZOffset, orientation)
-        face.updateNormalToFirstThreeVerts()
-        texYnOffset = (2 * self.outRadius - self.zStep) / (2 * self.outRadius)
-        face.texCoords = CellShape.__getCropSquareTexCoords(0.0, 0.0, 0.0, texYnOffset)
-        face.fanTriangles()
-        return face 
-
-    def getBlockFacesNeeded(self, sidesNeeded):
-        fList = []
-        fList.append(self.__getBlockFloorFace())
-        for side, zOffsetList in sidesNeeded.items():
-            for zOffset in zOffsetList:
-                fList.append(self.__getBlockSideFace(zOffset, side))
-        return fList
-
-###############################################################################
 # Worker class meshing one cell of the terrain
 class TerrainCellMesher:
 
@@ -542,21 +431,21 @@ class TerrainCellMesher:
                 Heading.getDirection2i(side).getX(), 
                 Heading.getDirection2i(side).getY())
 
-        self.cellInfo = CellInfo(LVector3f(0.0, 0.0, 0.0))
+        self.cellMeshInfo = CellMeshInfo(LVector3f(0.0, 0.0, 0.0))
 
     # Private
-    def __updateCellTapered(self, i, j):
-        self.__updateCellInfo(i, j)
+    def __updateTerrainCell(self, i, j):
+        self.__updateCellMeshInfo(i, j)
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        self.cellInfo = CellInfo(center)
-        self.cellInfo.centerComp.radius = self.cellInRadius
-        for sc in self.cellInfo.sideCompList:
+        self.cellMeshInfo = CellMeshInfo(center)
+        self.cellMeshInfo.centerComp.radius = self.cellInRadius
+        for sc in self.cellMeshInfo.sideCompList:
             sc.inRadius = self.cellInRadius
             sc.outRadius = self.cellOutRadius
             sc.stepHeight = self.mapHeightStep
             sc.rise = self.sideCell[sc.heading].heightRise
             sc.slope = "flat" if sc.rise <= 0 else "tapered"
-        for cc in self.cellInfo.cornerCompList:
+        for cc in self.cellMeshInfo.cornerCompList:
             cc.inRadius = self.cellInRadius
             cc.outRadius = self.cellOutRadius
             cc.stepHeight = self.mapHeightStep
@@ -571,13 +460,13 @@ class TerrainCellMesher:
                 cc.slope = "tapered" + adjYHeading
             elif(cc.xrise == 0 and cc.yrise == 0 and cc.crise > 0):
                 cc.slope = "foldednormal"
-            elif(cc.xrise > 0 and cc.yrise > 0):# and cc.crise > 0):
+            elif(cc.xrise > 0 and cc.yrise > 0):
                 cc.slope = "foldednormal"
             else: #if cc.rise <= 0:
                 cc.slope = "flat"
 
 
-    def __updateCellInfo(self, i, j):
+    def __updateCellMeshInfo(self, i, j):
         self.cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
         self.k = self.heightMap.getKHeightFromIJ(i, j)
         for dir,cell in self.sideCell.items():
@@ -588,27 +477,11 @@ class TerrainCellMesher:
                 cell.valid = False
                 cell.heightRise = 0     
 
-    def __meshCellBlockStyle(self, mesh, i, j):
-        # Initialize shape
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        cellShape = CellShape(center, self.cellOutRadius, self.cellInRadius, self.mapHeightStep)
-        
-        # Fill cell
-        sidesNeeded = { "xn" : [], "yn" : [], "xp" : [], "yp" : [] }
-        for side in Heading.DirectSides:
-            neighb = self.sideCell[side]
-            for rise in range(0, neighb.heightRise):
-                sidesNeeded[side].append(rise * self.mapHeightStep)
-        fList = cellShape.getBlockFacesNeeded(sidesNeeded) 
-        for f in fList:
-            f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
-            mesh.addFace(self.textureScheme, f)
-
-    def __meshCellTaperedStyle(self, mesh, i, j):
+    def __meshCell(self, mesh, i, j):
         # Initialize shape
         center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         cellShape = CellShape2()
-        fList = cellShape.getFaces(self.cellInfo) 
+        fList = cellShape.getFaces(self.cellMeshInfo) 
         for f in fList:
             f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
             mesh.addFace(self.textureScheme, f)
@@ -623,16 +496,12 @@ class TerrainCellMesher:
                 f.texMat = "clearwater"
                 mesh.addFace(self.textureScheme, f)
     
-    def meshCellTerrain(self, mesh, style, i, j):
-        if(style == "blockStyle"):
-            self.__updateCellInfo(i, j)
-            self.__meshCellBlockStyle(mesh, i, j)
-        else:
-            self.__updateCellTapered(i, j)
-            self.__meshCellTaperedStyle(mesh, i, j)
+    def meshCellTerrain(self, mesh, i, j):
+        self.__updateTerrainCell(i, j)
+        self.__meshCell(mesh, i, j)
 
     def meshCellWater(self, mesh, i, j):
-        self.__updateCellInfo(i, j)    
+        self.__updateCellMeshInfo(i, j)    
         self.__meshWater(mesh, i, j)
 
 ###############################################################################
@@ -642,24 +511,23 @@ class TerrainMesher:
     def __init__(self):
         pass
 
-    def generateTerrain(self, size):
-        self.size = size
-        self.heightMap = TerrainHeightMap(self.size)
-        self.heightMap.generateTerrain()
+    def generateTerrain(self, size, height):
+        self.heightMap = TerrainRegionMap(size, height)
+        FillTerrainMapBasic(self.heightMap)
         self.textureScheme = TextureScheme()
         self.cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme)
     
-    def meshTerrain(self, style):
+    def meshTerrain(self):
         terrainMesh = EnvironmentMesh()
-        for i in range(self.size):
-            for j in range(self.size):
-                self.cellMesher.meshCellTerrain(terrainMesh, style, i, j)
+        for i in range(self.heightMap.size):
+            for j in range(self.heightMap.size):
+                self.cellMesher.meshCellTerrain(terrainMesh, i, j)
         return terrainMesh.makeGeom()
 
     def meshWater(self):
         waterMesh = EnvironmentMesh()
-        for i in range(self.size):
-            for j in range(self.size):
+        for i in range(self.heightMap.size):
+            for j in range(self.heightMap.size):
                 self.cellMesher.meshCellWater(waterMesh,i,j)
         return waterMesh.makeGeom()
 

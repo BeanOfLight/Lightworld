@@ -28,26 +28,34 @@ from panda3d.core import Material
 import sys
 import os
 
+import cProfile
+
 from navigation import *
 from terrainMesh import TerrainMesher
 from avatar import LightworldAvatarControler 
 
-# Function to put instructions on the screen.
+# Function to put text on the screen.
 def addInstructions(pos, msg):
-    return OnscreenText(text=msg, style=1, fg=(1, 1, 1, 1), scale=.05,
+    return OnscreenText(text=msg, style=1, fg=(1, 1, 1, 1), scale=.04,
                         shadow=(0, 0, 0, 1), parent=base.a2dTopLeft,
                         pos=(0.08, -pos - 0.04), align=TextNode.ALeft)
 
+def addStatistics(pos, msg):
+    return OnscreenText(text=msg, style=1, fg=(1, 1, 1, 1), scale=.04,
+                        shadow=(0, 0, 0, 1), parent=base.a2dBottomLeft,
+                        pos=(0.08, pos + 0.04), align=TextNode.ALeft)
+
 # Function to put title on the screen.
 def addTitle(text):
-    return OnscreenText(text=text, style=1, fg=(1, 1, 1, 1), scale=.07,
+    return OnscreenText(text=text, style=1, fg=(1, 1, 1, 1), scale=.06,
                         parent=base.a2dBottomRight, align=TextNode.ARight,
                         pos=(-0.1, 0.09), shadow=(0, 0, 0, 1))
 
 # Game Class
 class LightworldBasic(ShowBase):
     def __init__(self):
-        #Interactive or overview mode
+        
+        # Interactive or overview mode
         self.overview = True
 
         # Set up the window, camera, etc.
@@ -60,15 +68,24 @@ class LightworldBasic(ShowBase):
                
         # Post the instructions
         self.title = addTitle("Lightworld: Explore the map")       
-        self.inst1 = addInstructions(0.06, "[ESC]: Quit")
-        self.inst2 = addInstructions(0.12, "[v]: Toggle Overview")
-        self.inst3 = addInstructions(0.18, "[s]: Toggle Terrain Style")
-        self.inst3 = addInstructions(0.24, "[+/-]: Change Size and Recreate")
-        self.inst4 = addInstructions(0.30, "[Space]: Update Terrain")
-        self.inst5 = addInstructions(0.36, "[Left Arrow]: Rotate Left")
-        self.inst6 = addInstructions(0.42, "[Right Arrow]: Rotate Right")
-        self.inst7 = addInstructions(0.48, "[Up Arrow]: Move Forward")
-        self.inst8 = addInstructions(0.54, "[Down Arrow]: Move Backward")
+        self.inst =[]
+        self.inst.append(addInstructions(0.05, "[ESC]: Quit"))
+        self.inst.append(addInstructions(0.10, "[v]: Toggle Overview"))
+        self.inst.append(addInstructions(0.15, "[+/-]: Change Size and Recreate"))
+        self.inst.append(addInstructions(0.20, "[Space]: Update Terrain"))
+        self.inst.append(addInstructions(0.25, "[Left Arrow]: Rotate Left"))
+        self.inst.append(addInstructions(0.30, "[Right Arrow]: Rotate Right"))
+        self.inst.append(addInstructions(0.35, "[Up Arrow]: Move Forward"))
+        self.inst.append(addInstructions(0.40, "[Down Arrow]: Move Backward"))
+
+
+        self.terrainSize = 64
+        self.terrainHeight = 30
+        self.stat = []
+        self.terrainSizeMsg = "Terrain Size: {0}"
+        self.stat.append(addStatistics(0.10, self.terrainSizeMsg.format(self.terrainSize)))
+        self.terrainHeightMsg = "Terrain Height: {0}"
+        self.stat.append(addStatistics(0.05, self.terrainHeightMsg.format(self.terrainHeight)))
 
         # Create the avatar
         avatarHeight = 1.6
@@ -84,8 +101,6 @@ class LightworldBasic(ShowBase):
 
         # Initialize terrain and avatar
         self.texture = loader.loadTexture("terrainTex2.png") 
-        self.terrainSize = 64
-        self.terrainStyle = "taperedStyle"
         self.terrainNode = NodePath()
         self.waterNode = NodePath()
         self.terrainMesher = TerrainMesher() 
@@ -96,7 +111,6 @@ class LightworldBasic(ShowBase):
         # Accept the control keys for movement and rotation
         self.accept("escape", sys.exit)
         self.accept("v", self.toggleOverview)
-        self.accept("s", self.toggleTerrainStyle)
         self.accept("+", self.increaseTerrainSize)
         self.accept("-", self.decreaseTerrainSize)
         self.accept("space", self.updateTerrain)
@@ -148,15 +162,16 @@ class LightworldBasic(ShowBase):
                 self.setBackgroundColor(*self.skyBackgroundColor)
 
     def updateTerrain(self):
-        self.terrainMesher.generateTerrain(self.terrainSize)
+        self.terrainMesher.generateTerrain(self.terrainSize, self.terrainHeight)
         self.updateTerrainMesh()
         self.updateWaterMesh()
         self.updateAvatarPosition()
         self.updateCameraPosition()
+        self.stat[0].setText(self.terrainSizeMsg.format(self.terrainSize))
 
     def updateTerrainMesh(self):
         self.terrainNode.removeNode()
-        terrainMesh = self.terrainMesher.meshTerrain(self.terrainStyle)
+        terrainMesh = self.terrainMesher.meshTerrain()
         snode = GeomNode('terrainPatch')
         snode.addGeom(terrainMesh)
         self.terrainNode = render.attachNewNode(snode)
@@ -171,13 +186,6 @@ class LightworldBasic(ShowBase):
         self.waterNode.setTexture(self.texture)
         self.waterNode.setTwoSided(True)
         self.waterNode.setTransparency(TransparencyAttrib.M_alpha)
-    
-    def toggleTerrainStyle(self):
-        if(self.terrainStyle == "taperedStyle"):
-            self.terrainStyle = "blockStyle"
-        else:
-            self.terrainStyle = "taperedStyle"
-        self.updateTerrainMesh()
 
     def increaseTerrainSize(self):
         self.terrainSize += self.terrainSize
@@ -193,19 +201,17 @@ class LightworldBasic(ShowBase):
         if self.overview == False:
             self.camLens.setFocalLength(0.4)
             self.camLens.setNear(0.1)          
-            self.inst4.show()
-            self.inst5.show()
-            self.inst6.show()
-            self.inst7.show()
-            self.inst8.show()
+            self.inst[4].show()
+            self.inst[5].show()
+            self.inst[6].show()
+            self.inst[7].show()
         else:
             self.disableMouse()
             self.camLens.setFocalLength(1)
-            self.inst4.hide()
-            self.inst5.hide()
-            self.inst6.hide()
-            self.inst7.hide()
-            self.inst8.hide()
+            self.inst[4].hide()
+            self.inst[5].hide()
+            self.inst[6].hide()
+            self.inst[7].hide()
             
         self.updateCameraPosition()
 
