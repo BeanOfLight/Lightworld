@@ -1,5 +1,6 @@
-#!/usr/bin/env python
-
+#########################################################################################
+# LightWorld
+# avatar.py
 # Author: Bastien Pesenti (bpesenti@yahoo.fr)
 # Date: 7/28/2019
 

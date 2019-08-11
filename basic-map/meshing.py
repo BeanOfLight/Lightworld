@@ -2,7 +2,7 @@
 # LightWorld
 # meshing.py
 # Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 7/28/2019
+# Date: 8/10/2019
 
 
 ###############################################################################

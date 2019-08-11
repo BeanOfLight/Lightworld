@@ -198,6 +198,147 @@ class CellFace:
         return face
 
 ###############################################################################
+# Cell shape class refactored
+class CellShape2:
+
+    def __init__(self):
+        pass
+
+    def getWaterFaces(self, center):
+        fList = []
+        waterCenter = center
+        fList.append(CellFace.MakeSquareFace(
+            waterCenter, 
+            LVector3f(0.0, 0.0, 1.0), 
+            LVector3f(0.0, 1.0, 0.0), 
+            1.0, 1.0, 1.0))
+        return fList
+    
+    def getFaces(self, cellMeshInfo):
+        cmi = cellMeshInfo
+        fList = []
+        fList.append(CellFace.MakeSquareFace(
+            cmi.center, 
+            LVector3f(0.0, 0.0, 1.0), 
+            LVector3f(0.0, 1.0, 0.0), 
+            cmi.centerComp.radius, cmi.centerComp.radius, 
+            1.0))
+
+        midRadius = (cmi.radius+cmi.centerComp.radius) / 2.0
+        ringHalfWitdh = (cmi.radius-cmi.centerComp.radius) / 2.0
+        ringHalfWitdhDiag = (cmi.radius-cmi.centerComp.radius) / 2.0 * math.sqrt(2.0)
+        for sc in cmi.sideCompList:
+            headingDir = Heading.getDirection3f(sc.heading)
+            center = cmi.center + headingDir * midRadius
+            if(sc.slope == "flat"):
+                fList.append(CellFace.MakeSquareFace(
+                    center, 
+                    LVector3f(0.0, 0.0, 1.0), 
+                    headingDir,
+                    cmi.centerComp.radius,
+                    ringHalfWitdh,
+                    1.0))                
+            elif(sc.slope == "tapered"):
+                tcenter = center + LVector3f(0.0, 0.0, 1.0) * cmi.stepHeight / 2.0
+                tnormal = (LVector3f(0.0, 0.0, 1.0) - headingDir)
+                tnormal.normalize()
+                tup = (headingDir + LVector3f(0.0, 0.0, 1.0))
+                tup.normalize()
+                fList.append(CellFace.MakeSquareFace(
+                    tcenter, 
+                    tnormal, 
+                    tup,
+                    cmi.centerComp.radius,
+                    ringHalfWitdhDiag,
+                    1.0)) 
+                
+                # Vertical for further rise
+                for lvl in range(1,sc.rise):
+                    vcenter = cmi.center + headingDir * cmi.radius + LVector3f(0.0, 0.0, 1.0) * cmi.stepHeight * (2.0 * lvl + 1.0) / 2.0
+                    vnormal = -headingDir
+                    vup = LVector3f(0.0, 0.0, 1.0)
+                    fList.append(CellFace.MakeSquareFace(
+                        vcenter, 
+                        vnormal, 
+                        vup,
+                        cmi.radius,
+                        ringHalfWitdh,
+                        1.0))
+                
+        for cc in cmi.cornerCompList:
+            headingDir = Heading.getDirection3f(cc.heading)
+            center = cmi.center + headingDir * midRadius
+            if(cc.slope == "flat"):
+                fList.append(CellFace.MakeSquareFace(
+                    center, 
+                    LVector3f(0.0, 0.0, 1.0), 
+                    LVector3f(0.0, 1.0, 0.0),
+                    ringHalfWitdh,
+                    ringHalfWitdh,
+                    1.0))
+            
+            elif(cc.slope == "taperedxn" or cc.slope == "taperedyn" or cc.slope == "taperedxp" or cc.slope == "taperedyp"):
+                taperHeading = cc.slope[-2:]
+                taperHeadingDir = Heading.getDirection3f(taperHeading)
+                taperAxis = Heading.getAxis(taperHeading)
+                center = center + LVector3f(0.0, 0.0, 1.0) * cmi.stepHeight / 2.0
+                normal = (LVector3f(0.0, 0.0, 1.0) - taperHeadingDir)
+                normal.normalize()
+                up = (taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
+                up.normalize()
+                fList.append(CellFace.MakeSquareFace(
+                    center, 
+                    normal, 
+                    up,
+                    ringHalfWitdh,
+                    ringHalfWitdhDiag,
+                    1.0))         
+
+                # Need to fill side triangle in case cell in non-taper dir is lower
+                adjHeadings = Heading.getAdjascentHeadings(cc.heading)
+                for h in adjHeadings:
+                    if not(h == taperHeading):
+                        nonTaperHeading = h
+                nonTaperHeadingDir = Heading.getDirection3f(nonTaperHeading)
+                nonTaperAxis = Heading.getAxis(nonTaperHeading)
+                nonTaperRise = cc.xrise if nonTaperAxis == "x" else cc.yrise
+                xSign = Heading.getDirection3f(cc.heading).getX()
+                ySign = Heading.getDirection3f(cc.heading).getY()
+                if(nonTaperRise<0 or (nonTaperRise == 0 and cc.crise < 0)):
+                    vcorner = LVector3f(cmi.center.getX() + cmi.radius * xSign, cmi.center.getY() + cmi.radius * ySign, cmi.center.getZ())
+                    vin = vcorner - taperHeadingDir * (cmi.radius - cmi.centerComp.radius)
+                    vup = LVector3f(cmi.center.getX() + cmi.radius * xSign, cmi.center.getY() + cmi.radius * ySign, cmi.center.getZ() + cmi.stepHeight)
+                    
+                    angle = nonTaperHeadingDir.signedAngleDeg(taperHeadingDir, LVector3f(0.0, 0.0, 1.0))
+                    if(angle > 0):
+                        verts1 = [vin, vcorner, vup]
+                        face1 = CellFace.MakeTriangle(verts1, 1.0)
+                        fList.append(face1)
+                    else:
+                        verts2 = [vcorner, vin, vup]
+                        face2 = CellFace.MakeTriangle(verts2, 1.0)
+                        fList.append(face2)
+                
+            elif(cc.slope == "foldednormal"):
+                xSign = Heading.getDirection3f(cc.heading).getX()
+                ySign = Heading.getDirection3f(cc.heading).getY()
+                vin = LVector3f(cmi.center.getX() + cmi.centerComp.radius * xSign, cmi.center.getY() + cmi.centerComp.radius * ySign, cmi.center.getZ())
+                maxrise = max(cc.crise, cc.xrise, cc.yrise) 
+                vcout = LVector3f(cmi.center.getX() + cmi.radius * xSign, cmi.center.getY() + cmi.radius * ySign, cmi.center.getZ() + min(maxrise, 1) * cmi.stepHeight)
+                vxout = LVector3f(cmi.center.getX() + cmi.radius * xSign, cmi.center.getY() + cmi.centerComp.radius * ySign, cmi.center.getZ() + min(cc.xrise, 1) * cmi.stepHeight)
+                vyout = LVector3f(cmi.center.getX() + cmi.centerComp.radius * xSign, cmi.center.getY() + cmi.radius * ySign, cmi.center.getZ() + min(cc.yrise, 1) * cmi.stepHeight)
+                verts = []
+                if(xSign * ySign > 0):
+                    verts = [vin, vxout, vcout, vyout]
+                else:
+                    verts = [vin, vyout, vcout, vxout]
+                faces = CellFace.MakeNonPlanarSquare(verts, 1.0)
+                fList.append(faces[0])
+                fList.append(faces[1])
+            
+        return fList
+
+###############################################################################
 # Cell parameters
 #
 #   xnyp            yp           xpyp
@@ -217,243 +358,115 @@ class CellFace:
 #   xnyn            yn           xpyn
 #
 class CenterComponent:
-    def __init__(self, center):
-        self.center = center
-        self.radius = 0.5
+    def __init__(self):
+        self.radius = 0.0
 
 class SideComponent:
-    def __init__(self, center, heading):
-        self.center = center
-        self.inRadius = 0.5
-        self.outRadius = 1.0
+    def __init__(self, heading):
         self.heading = heading # in "xn", "yn", "xp", "yp"
-        self.stepHeight = 0.5
         self.rise = 0 # rise of direct neighbor
         self.slope = "" # in "flat", "block", "tapered"
 
 class CornerComponent:
-    def __init__(self, center, heading):
-        self.center = center
-        self.inRadius = 0.5
-        self.outRadius = 1.0
+    def __init__(self, heading):
         self.heading = heading # in "xnyn", "xpyn", "xpyp", "xnyp"
-        self.stepHeight = 0.5
         self.crise = 0 # rise of corner neighbor
         self.xrise = 0 # rise of direct neighbor in closest x direction
         self.yrise = 0 # rise of direct neighbor in closest y direction
         self.slope = "" # in "flat", "block", "taperedxn", "taperedyn", "taperedxp", "taperedyp", "foldednormal"
 
+class NeighbCellInfo:
+    def __init__(self):
+        self.valid = False
+        self.rise = 0
+
 class CellMeshInfo:
-    def __init__(self, center):
-        self.center = center
-        self.centerComp = CenterComponent(center)
+    def __init__(self):
+        # Invariants
+        self.radius = 0.0
+        self.stepHeight = 0.0
+
+        # Center
+        self.center = LVector3f(0.0, 0.0, 0.0)
+        self.kHeight = 0
+
+        # External Neighbor Info
+        self.neighborInfo = {
+            "xn" : NeighbCellInfo(),
+            "yn" : NeighbCellInfo(),
+            "xp" : NeighbCellInfo(),
+            "yp" : NeighbCellInfo(),
+            "xnyn" : NeighbCellInfo(),
+            "xpyn" : NeighbCellInfo(),
+            "xpyp" : NeighbCellInfo(),
+            "xnyp" : NeighbCellInfo()
+        }
+    
+        # Internal Mesh Components
+        self.centerComp = CenterComponent()
         self.sideCompList = [
-            SideComponent(center, "xn"),
-            SideComponent(center, "yn"),
-            SideComponent(center, "yp"),
-            SideComponent(center, "xp")
+            SideComponent("xn"),
+            SideComponent("yn"),
+            SideComponent("yp"),
+            SideComponent("xp")
         ]
         self.cornerCompList = [
-            CornerComponent(center, "xnyn"),
-            CornerComponent(center, "xpyn"),
-            CornerComponent(center, "xpyp"),
-            CornerComponent(center, "xnyp")
+            CornerComponent("xnyn"),
+            CornerComponent("xpyn"),
+            CornerComponent("xpyp"),
+            CornerComponent("xnyp")
         ]   
-###############################################################################
-# Cell shape class refactored
-class CellShape2:
-
-    def __init__(self):
-        pass
-
-    def getWaterFaces(self, center):
-        fList = []
-        waterCenter = center
-        fList.append(CellFace.MakeSquareFace(
-            waterCenter, 
-            LVector3f(0.0, 0.0, 1.0), 
-            LVector3f(0.0, 1.0, 0.0), 
-            1.0, 1.0, 1.0))
-        return fList
-    
-    def getFaces(self, cellInfo):
-        fList = []
-        fList.append(CellFace.MakeSquareFace(
-            cellInfo.center, 
-            LVector3f(0.0, 0.0, 1.0), 
-            LVector3f(0.0, 1.0, 0.0), 
-            cellInfo.centerComp.radius, cellInfo.centerComp.radius, 
-            1.0))
-
-        for sc in cellInfo.sideCompList:
-            headingDir = Heading.getDirection3f(sc.heading)
-            center = cellInfo.center + headingDir * (sc.outRadius+sc.inRadius) / 2.0
-            if(sc.slope == "flat"):
-                fList.append(CellFace.MakeSquareFace(
-                    center, 
-                    LVector3f(0.0, 0.0, 1.0), 
-                    headingDir,
-                    sc.inRadius,
-                    (sc.outRadius-sc.inRadius) / 2.0,
-                    1.0))                
-            elif(sc.slope == "tapered"):
-                tcenter = center + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
-                tnormal = (LVector3f(0.0, 0.0, 1.0) - headingDir)
-                tnormal.normalize()
-                tup = (headingDir + LVector3f(0.0, 0.0, 1.0))
-                tup.normalize()
-                fList.append(CellFace.MakeSquareFace(
-                    tcenter, 
-                    tnormal, 
-                    tup,
-                    sc.inRadius,
-                    (sc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
-                    1.0)) 
-                
-                # Vertical for further rise
-                for lvl in range(1,sc.rise):
-                    vcenter = cellInfo.center + headingDir * sc.outRadius + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight * (2.0 * lvl + 1.0) / 2.0
-                    vnormal = -headingDir
-                    vup = LVector3f(0.0, 0.0, 1.0)
-                    fList.append(CellFace.MakeSquareFace(
-                        vcenter, 
-                        vnormal, 
-                        vup,
-                        sc.outRadius,
-                        (sc.outRadius-sc.inRadius) / 2.0,
-                        1.0))
-                
-        for cc in cellInfo.cornerCompList:
-            headingDir = Heading.getDirection3f(cc.heading)
-            center = cellInfo.center + headingDir * (cc.outRadius+cc.inRadius) / 2.0
-            if(cc.slope == "flat"):
-                fList.append(CellFace.MakeSquareFace(
-                    center, 
-                    LVector3f(0.0, 0.0, 1.0), 
-                    LVector3f(0.0, 1.0, 0.0),
-                    (cc.outRadius-sc.inRadius) / 2.0,
-                    (cc.outRadius-sc.inRadius) / 2.0,
-                    1.0))
-            
-            elif(cc.slope == "taperedxn" or cc.slope == "taperedyn" or cc.slope == "taperedxp" or cc.slope == "taperedyp"):
-                taperHeading = cc.slope[-2:]
-                taperHeadingDir = Heading.getDirection3f(taperHeading)
-                taperAxis = Heading.getAxis(taperHeading)
-                center = center + LVector3f(0.0, 0.0, 1.0) * sc.stepHeight / 2.0
-                normal = (LVector3f(0.0, 0.0, 1.0) - taperHeadingDir)
-                normal.normalize()
-                up = (taperHeadingDir + LVector3f(0.0, 0.0, 1.0))
-                up.normalize()
-                fList.append(CellFace.MakeSquareFace(
-                    center, 
-                    normal, 
-                    up,
-                    (cc.outRadius-sc.inRadius) / 2.0,
-                    (cc.outRadius-sc.inRadius) / 2.0 * math.sqrt(2.0),
-                    1.0))
-                
-
-                # Need to fill side triangle in case cell in non-taper dir is lower
-                adjHeadings = Heading.getAdjascentHeadings(cc.heading)
-                for h in adjHeadings:
-                    if not(h == taperHeading):
-                        nonTaperHeading = h
-                nonTaperHeadingDir = Heading.getDirection3f(nonTaperHeading)
-                nonTaperAxis = Heading.getAxis(nonTaperHeading)
-                nonTaperRise = cc.xrise if nonTaperAxis == "x" else cc.yrise
-                xSign = Heading.getDirection3f(cc.heading).getX()
-                ySign = Heading.getDirection3f(cc.heading).getY()
-                if(nonTaperRise<0 or (nonTaperRise == 0 and cc.crise < 0)):
-                    vcorner = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ())
-                    vin = vcorner - taperHeadingDir * (cc.outRadius - cc.inRadius)
-                    vup = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + cc.stepHeight)
-                    
-                    angle = nonTaperHeadingDir.signedAngleDeg(taperHeadingDir, LVector3f(0.0, 0.0, 1.0))
-                    if(angle > 0):
-                        verts1 = [vin, vcorner, vup]
-                        face1 = CellFace.MakeTriangle(verts1, 1.0)
-                        fList.append(face1)
-                    else:
-                        verts2 = [vcorner, vin, vup]
-                        face2 = CellFace.MakeTriangle(verts2, 1.0)
-                        fList.append(face2)
-                
-            elif(cc.slope == "foldednormal"):
-                xSign = Heading.getDirection3f(cc.heading).getX()
-                ySign = Heading.getDirection3f(cc.heading).getY()
-                vin = LVector3f(cc.center.getX() + cc.inRadius * xSign, cc.center.getY() + cc.inRadius * ySign, cc.center.getZ())
-                maxrise = max(cc.crise, cc.xrise, cc.yrise) 
-                vcout = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + min(maxrise, 1) * cc.stepHeight)
-                vxout = LVector3f(cc.center.getX() + cc.outRadius * xSign, cc.center.getY() + cc.inRadius * ySign, cc.center.getZ() + min(cc.xrise, 1) * cc.stepHeight)
-                vyout = LVector3f(cc.center.getX() + cc.inRadius * xSign, cc.center.getY() + cc.outRadius * ySign, cc.center.getZ() + min(cc.yrise, 1) * cc.stepHeight)
-                verts = []
-                if(xSign * ySign > 0):
-                    verts = [vin, vxout, vcout, vyout]
-                else:
-                    verts = [vin, vyout, vcout, vxout]
-                faces = CellFace.MakeNonPlanarSquare(verts, 1.0)
-                fList.append(faces[0])
-                fList.append(faces[1])
-            
-        return fList
 
 ###############################################################################
 # Worker class meshing one cell of the terrain
 class TerrainCellMesher:
 
-    class NeighbCell:
-        def __init__(self, di, dj):
-            # Is it inside the terrain
-            self.valid = False
-
-            # Location
-            self.di = di
-            self.dj = dj
-
-            # Properties
-            self.heightRise = 0 #difference in height increments (positive = higher)
-
-    def __init__(self, terrainHeightMap, textureScheme):
-        # Parameters      
-        self.cellOutRadius = 1.0
-        self.cellInRadius = 0.5
-        self.mapHeightStep = 0.5
-        
-        # Source Data
+    def __init__(self, terrainHeightMap, textureScheme):       
+        # cell-invariant settings
         self.heightMap = terrainHeightMap
         self.textureScheme = textureScheme
+        self.cmi = CellMeshInfo()
+        self.cmi.radius = terrainHeightMap.cellDimension / 2.0
+        self.cmi.stepHeight = terrainHeightMap.heightStep
+        self.waterOffset = terrainHeightMap.waterOffset
 
-        # Cell Information
-        self.height = 0 #height in map increments
-        self.sideCell = {}
-        for side in Heading.AllSides:
-            self.sideCell[side] = self.NeighbCell(
-                Heading.getDirection2i(side).getX(), 
-                Heading.getDirection2i(side).getY())
+    def __updateCenterAndHeight(self, i, j):
+        # cell position settings
+        self.i = i
+        self.j = j
+        center2i = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
+        self.cmi.center = LVector3f(center2i.getX(), center2i.getY(), self.heightMap.getZHeightFromIJ(i, j))
+        self.cmi.kHeight = self.heightMap.getKHeightFromIJ(i, j)
+    
+    def __updateTerrainCellMeshInfo(self):
+        
+        # neighbor cells
+        for dir,nbInfo in self.cmi.neighborInfo.items():
+            nbOffset = Heading.getDirection2i(dir)
+            di = nbOffset.getX()
+            dj = nbOffset.getY()
+            if(self.heightMap.isValid(self.i + di, self.j + dj)):
+                nbInfo.valid = True
+                nbInfo.rise = self.heightMap.getKHeightFromIJ(self.i+di, self.j+dj) -self.cmi.kHeight
+            else:
+                nbInfo.valid = False
+                nbInfo.rise = 0 
 
-        self.cellMeshInfo = CellMeshInfo(LVector3f(0.0, 0.0, 0.0))
+        # center component
+        self.cmi.centerComp.radius = self.cmi.radius / 2.0
 
-    # Private
-    def __updateTerrainCell(self, i, j):
-        self.__updateCellMeshInfo(i, j)
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
-        self.cellMeshInfo = CellMeshInfo(center)
-        self.cellMeshInfo.centerComp.radius = self.cellInRadius
-        for sc in self.cellMeshInfo.sideCompList:
-            sc.inRadius = self.cellInRadius
-            sc.outRadius = self.cellOutRadius
-            sc.stepHeight = self.mapHeightStep
-            sc.rise = self.sideCell[sc.heading].heightRise
+        # side components
+        for sc in self.cmi.sideCompList:
+            sc.rise = self.cmi.neighborInfo[sc.heading].rise
             sc.slope = "flat" if sc.rise <= 0 else "tapered"
-        for cc in self.cellMeshInfo.cornerCompList:
-            cc.inRadius = self.cellInRadius
-            cc.outRadius = self.cellOutRadius
-            cc.stepHeight = self.mapHeightStep
-            cc.crise = self.sideCell[cc.heading].heightRise
+        
+        # corner components
+        for cc in self.cmi.cornerCompList:
+            cc.crise = self.cmi.neighborInfo[cc.heading].rise
             adjXHeading = Heading.getAdjascentXHeading(cc.heading)
-            cc.xrise = self.sideCell[adjXHeading].heightRise
+            cc.xrise = self.cmi.neighborInfo[adjXHeading].rise
             adjYHeading = Heading.getAdjascentYHeading(cc.heading)
-            cc.yrise = self.sideCell[adjYHeading].heightRise
+            cc.yrise = self.cmi.neighborInfo[adjYHeading].rise
             if(cc.xrise > 0 and cc.yrise <= 0):
                 cc.slope = "tapered" + adjXHeading
             elif(cc.xrise <= 0 and cc.yrise > 0):
@@ -465,44 +478,32 @@ class TerrainCellMesher:
             else: #if cc.rise <= 0:
                 cc.slope = "flat"
 
-
-    def __updateCellMeshInfo(self, i, j):
-        self.cellCenter = self.heightMap.getXYLocationFromIJ(LVector2i(i,j))
-        self.k = self.heightMap.getKHeightFromIJ(i, j)
-        for dir,cell in self.sideCell.items():
-            if(self.heightMap.isValid(i + cell.di, j + cell.dj)):
-                cell.valid = True
-                cell.heightRise = self.heightMap.getKHeightFromIJ(i+cell.di, j+cell.dj) - self.k
-            else:
-                cell.valid = False
-                cell.heightRise = 0     
-
-    def __meshCell(self, mesh, i, j):
+    def __meshCell(self, mesh):
         # Initialize shape
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), self.heightMap.getZHeightFromIJ(i, j))
         cellShape = CellShape2()
-        fList = cellShape.getFaces(self.cellMeshInfo) 
+        fList = cellShape.getFaces(self.cmi) 
         for f in fList:
             f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
             mesh.addFace(self.textureScheme, f)
 
-    def __meshWater(self, mesh, i, j):
+    def __meshWater(self, mesh):
         # If water cell, add water surface face
-        center = LVector3f(self.cellCenter.getX(), self.cellCenter.getY(), -0.25)
+        center3f = LVector3f(self.cmi.center.getX(), self.cmi.center.getY(), -self.waterOffset)
         cellShape = CellShape2()
-        if(self.heightMap.hasWater(i,j)):
-            fList = cellShape.getWaterFaces(center)
+        if(self.heightMap.hasWater(self.i,self.j)):
+            fList = cellShape.getWaterFaces(center3f)
             for f in fList:
                 f.texMat = "clearwater"
                 mesh.addFace(self.textureScheme, f)
     
     def meshCellTerrain(self, mesh, i, j):
-        self.__updateTerrainCell(i, j)
-        self.__meshCell(mesh, i, j)
+        self.__updateCenterAndHeight(i, j)
+        self.__updateTerrainCellMeshInfo()
+        self.__meshCell(mesh)
 
-    def meshCellWater(self, mesh, i, j):
-        self.__updateCellMeshInfo(i, j)    
-        self.__meshWater(mesh, i, j)
+    def meshCellWater(self, mesh, i, j):   
+        self.__updateCenterAndHeight(i, j)
+        self.__meshWater(mesh)
 
 ###############################################################################
 # Worker class generating the terrain mesh

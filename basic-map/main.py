@@ -80,7 +80,7 @@ class LightworldBasic(ShowBase):
 
 
         self.terrainSize = 64
-        self.terrainHeight = 30
+        self.terrainHeight = 32
         self.stat = []
         self.terrainSizeMsg = "Terrain Size: {0}"
         self.stat.append(addStatistics(0.10, self.terrainSizeMsg.format(self.terrainSize)))
@@ -168,6 +168,7 @@ class LightworldBasic(ShowBase):
         self.updateAvatarPosition()
         self.updateCameraPosition()
         self.stat[0].setText(self.terrainSizeMsg.format(self.terrainSize))
+        self.stat[1].setText(self.terrainSizeMsg.format(self.terrainHeight))
 
     def updateTerrainMesh(self):
         self.terrainNode.removeNode()
@@ -188,12 +189,14 @@ class LightworldBasic(ShowBase):
         self.waterNode.setTransparency(TransparencyAttrib.M_alpha)
 
     def increaseTerrainSize(self):
-        self.terrainSize += self.terrainSize
+        self.terrainSize = round(self.terrainSize * 2.0)
+        self.terrainHeight = round(self.terrainHeight * 1.75)
         self.updateTerrain()
 
     def decreaseTerrainSize(self):
         if(self.terrainSize > 1):
-            self.terrainSize -= round(self.terrainSize / 2.0)
+            self.terrainSize = round(self.terrainSize / 2.0)
+            self.terrainHeight = round(self.terrainHeight / 1.75)
             self.updateTerrain()
 
     def toggleOverview(self):
