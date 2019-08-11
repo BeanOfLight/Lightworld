@@ -80,12 +80,12 @@ class LightworldBasic(ShowBase):
 
 
         self.terrainSize = 64
-        self.terrainHeight = 32
+        self.terrainHeight = 18
         self.stat = []
         self.terrainSizeMsg = "Terrain Size: {0}"
         self.stat.append(addStatistics(0.10, self.terrainSizeMsg.format(self.terrainSize)))
-        self.terrainHeightMsg = "Terrain Height: {0}"
-        self.stat.append(addStatistics(0.05, self.terrainHeightMsg.format(self.terrainHeight)))
+        self.terrainMaxHeightMsg = "Terrain Max Height: {0}"
+        self.stat.append(addStatistics(0.05, self.terrainMaxHeightMsg.format(self.terrainHeight)))
 
         # Create the avatar
         avatarHeight = 1.6
@@ -168,7 +168,7 @@ class LightworldBasic(ShowBase):
         self.updateAvatarPosition()
         self.updateCameraPosition()
         self.stat[0].setText(self.terrainSizeMsg.format(self.terrainSize))
-        self.stat[1].setText(self.terrainSizeMsg.format(self.terrainHeight))
+        self.stat[1].setText(self.terrainMaxHeightMsg.format(self.terrainHeight))
 
     def updateTerrainMesh(self):
         self.terrainNode.removeNode()
@@ -190,13 +190,13 @@ class LightworldBasic(ShowBase):
 
     def increaseTerrainSize(self):
         self.terrainSize = round(self.terrainSize * 2.0)
-        self.terrainHeight = round(self.terrainHeight * 1.75)
+        self.terrainHeight = round(self.terrainHeight * 1.5)
         self.updateTerrain()
 
     def decreaseTerrainSize(self):
         if(self.terrainSize > 1):
             self.terrainSize = round(self.terrainSize / 2.0)
-            self.terrainHeight = round(self.terrainHeight / 1.75)
+            self.terrainHeight = round(self.terrainHeight / 1.5)
             self.updateTerrain()
 
     def toggleOverview(self):

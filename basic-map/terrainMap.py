@@ -30,7 +30,7 @@ def FillTerrainMapBasic(terrainRegionMap):
             g = (g-0.25)/0.75
             # make mountain more spiky and plains more flat
             if g>0:
-                g = g ** 2
+                g = g ** 3
             # return to 0.25 to 1 range
             g = (g+1)/2
             terrainImage.setGray(i,j,g)
@@ -47,12 +47,16 @@ def FillTerrainMapBasic(terrainRegionMap):
                 terrainImage.setGray(i,j,g)
 
     # Convert to kHeight
-    # Height in integer increments between -10 and 10
+    # Height in integer increments between -self.height and  self.height
+    trm.maxKHeight = -trm.height
     for i in range(trm.size):
         for j in range(trm.size):
-            trm.heightMap[i][j] = round((terrainImage.getGray(i,j)-0.5)*trm.height)
-            if(trm.heightMap[i][j] < 0):
+            kHeight= round((terrainImage.getGray(i,j)-0.5)*trm.height*2)
+            trm.heightMap[i][j] = kHeight
+            if(kHeight < 0):
                 trm.waterMap[i][j] = True
+            if(kHeight > trm.maxKHeight):
+                trm.maxKHeight = kHeight
 
 ###############################################################################
 # Class holding all information about a terrain region
@@ -70,6 +74,9 @@ class TerrainRegionMap:
         self.heightMap = [[0 for i in range(self.size)] for j in range(self.size)]
         self.waterMap = [[False for i in range(self.size)] for j in range(self.size)]
         self.waterOffset = self.heightStep / 2.0
+
+        # Statistics for the terrain data
+        self.maxKHeight = 0.0
     
     def isValid(self, i,j):
         return i >= 0 and i < self.size and j >= 0 and j < self.size

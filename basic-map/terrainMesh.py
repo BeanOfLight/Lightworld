@@ -7,12 +7,14 @@
 
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
+from panda3d.core import LVector4f
 
 import random
 import math
 
 from terrainMap import *
 from navigation import *
+from meshing import *
 
 # Description
 # Tiled terrain map in 2x2m tiles
@@ -20,7 +22,7 @@ from navigation import *
 
 ###############################################################################
 # Container for the Environment Mesh Data (terrain, water, etc...)
-class EnvironmentMesh:
+class Mesh:
     def __init__(self):
         self.format = GeomVertexFormat.getV3n3cpt2()
         self.vdata = GeomVertexData('terrain', self.format, Geom.UHDynamic)
@@ -31,14 +33,15 @@ class EnvironmentMesh:
         self.normal = GeomVertexWriter(self.vdata, 'normal')
         self.numVerts = 0
 
-    def addFace(self, textureScheme, face):
+    def addFace(self, textureUVMap, face):
         n = face.normal
+        c = face.color
         for v in face.verts:
             self.vertex.add_data3(v.getX(), v.getY(), v.getZ())
             self.normal.addData3(n.getX(), n.getY(), n.getZ())
-            self.color.addData4f(1.0, 1.0, 1.0, 0.8)
+            self.color.addData4f(c.getX(), c.getY(), c.getZ(), c.getW())
         for tc in face.texCoords:
-            schemeTC = textureScheme.getUVFromXY(face.texMat, tc.getX(), tc.getY())
+            schemeTC = textureUVMap.getUVFromXY(face.texMat, tc.getX(), tc.getY())
             self.texcoord.addData2f(schemeTC.getX(), schemeTC.getY())               
         mv = self.numVerts
         for t in face.triangles:
@@ -54,49 +57,32 @@ class EnvironmentMesh:
 
 ###############################################################################
 # Class managing texture computation
-#
-#     +---------+
-#  ^  |         |
-#  |  |         |
-#  Y  |         |
-#     +---------+
-#        X -->
 
-class TextureScheme:
+class TerrainTextureScheme:
 
     def __init__(self):
-        self.scale = 0.2
-        self.materialOffset = {
-            "rock"      : LVector2f(0.025, 0.025),
-            "snow"      : LVector2f(0.275, 0.025),
-            "dirt"      : LVector2f(0.525, 0.025),
-            "hillgrass" : LVector2f(0.025, 0.275),
-            "plaingrass": LVector2f(0.275, 0.275),
-            "darksand"  : LVector2f(0.525, 0.275),
-            "lightsand" : LVector2f(0.775, 0.275),
-            "darkwater" : LVector2f(0.025, 0.525),
-            "clearwater": LVector2f(0.275, 0.525)
-            }
-    
-    # Get UV coordinates from the right material, from xy in [0.0,1.0] range
-    def getUVFromXY(self, material, x, y):
-        offset = self.materialOffset[material]
-        uv = LVector2f(x,y) * self.scale
-        return offset + uv
+        self.uvMap = TextureUVMap(4)
+        self.uvMap.addMaterial("rock", 0, 0)
+        self.uvMap.addMaterial("snow", 1, 0)
+        self.uvMap.addMaterial("dirt", 2, 0)
+        self.uvMap.addMaterial("hillgrass", 0, 1)
+        self.uvMap.addMaterial("plaingrass", 1, 1)
+        self.uvMap.addMaterial("darksand", 2, 1)
+        self.uvMap.addMaterial("lightsand", 3, 1)
+        self.uvMap.addMaterial("darkwater", 0, 2)
+        self.uvMap.addMaterial("clearwater", 1, 2)
 
-    def getMaterial(self, zHeight, normal):
-
-        if(zHeight<-1.01):
+    def getMaterial(self, zHeight, maxHeight, normal):
+        zPercent = zHeight / maxHeight
+        if(zPercent<-0.101):
             return "darksand"
-        if(zHeight<-0.01):
+        if(zPercent<-0.001):
             return "lightsand"
-        elif(zHeight<0.01):
+        elif(zPercent<0.021):
             return "plaingrass"
-        #elif(normal.getZ() < 0.2):
-        #   return "rock"
-        elif(zHeight<2.01):
+        elif(zPercent<0.401):
             return "hillgrass"
-        elif(zHeight<5.01):
+        elif(zPercent<0.701):
             return "rock"
         else:
             return "snow"
@@ -110,6 +96,7 @@ class CellFace:
         self.texMat = ""
         self.normal = []
         self.triangles = []
+        self.color = LVector4f(1.0, 1.0, 1.0, 1.0)
 
     def updateNormalToFirstThreeVerts(self):
         v1 = self.verts[1] - self.verts[0]
@@ -482,9 +469,10 @@ class TerrainCellMesher:
         # Initialize shape
         cellShape = CellShape2()
         fList = cellShape.getFaces(self.cmi) 
+        maxHeight = self.heightMap.height * self.heightMap.heightStep
         for f in fList:
-            f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), f.normal)
-            mesh.addFace(self.textureScheme, f)
+            f.texMat = self.textureScheme.getMaterial(f.getVertsCentroid().getZ(), maxHeight, f.normal)
+            mesh.addFace(self.textureScheme.uvMap, f)
 
     def __meshWater(self, mesh):
         # If water cell, add water surface face
@@ -494,7 +482,8 @@ class TerrainCellMesher:
             fList = cellShape.getWaterFaces(center3f)
             for f in fList:
                 f.texMat = "clearwater"
-                mesh.addFace(self.textureScheme, f)
+                f.color.setW(0.85)
+                mesh.addFace(self.textureScheme.uvMap, f)
     
     def meshCellTerrain(self, mesh, i, j):
         self.__updateCenterAndHeight(i, j)
@@ -515,18 +504,18 @@ class TerrainMesher:
     def generateTerrain(self, size, height):
         self.heightMap = TerrainRegionMap(size, height)
         FillTerrainMapBasic(self.heightMap)
-        self.textureScheme = TextureScheme()
+        self.textureScheme = TerrainTextureScheme()
         self.cellMesher = TerrainCellMesher(self.heightMap, self.textureScheme)
     
     def meshTerrain(self):
-        terrainMesh = EnvironmentMesh()
+        terrainMesh = Mesh()
         for i in range(self.heightMap.size):
             for j in range(self.heightMap.size):
                 self.cellMesher.meshCellTerrain(terrainMesh, i, j)
         return terrainMesh.makeGeom()
 
     def meshWater(self):
-        waterMesh = EnvironmentMesh()
+        waterMesh = Mesh()
         for i in range(self.heightMap.size):
             for j in range(self.heightMap.size):
                 self.cellMesher.meshCellWater(waterMesh,i,j)
