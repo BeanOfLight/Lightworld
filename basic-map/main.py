@@ -23,8 +23,6 @@ from panda3d.core import LVector3
 from panda3d.core import NodePath
 from panda3d.core import Fog
 
-
-#import direct.directbase.DirectStart
 from panda3d.core import Material
 
 import sys
@@ -233,11 +231,11 @@ class LightworldBasic(ShowBase):
 
     def move(self, task):       
         if(self.avatarControler.moving == True):
-            self.avatarControler.moveByDistance(0.1)
+            self.avatarControler.moveByDistance(0.15)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
         elif(self.avatarControler.turning == True):
-            self.avatarControler.turnByDistance(0.1)
+            self.avatarControler.turnByDistance(0.15)
             self.camera.setPos(self.avatarControler.curCamPos)
             self.camera.lookAt(self.avatarControler.curPos)
         if(self.overview == False):

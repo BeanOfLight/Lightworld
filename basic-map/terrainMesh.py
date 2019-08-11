@@ -95,8 +95,8 @@ class TextureScheme:
             return "lightsand"
         elif(zHeight<0.01):
             return "plaingrass"
-        elif(normal.getZ() < 0.2):
-           return "rock"
+        #elif(normal.getZ() < 0.2):
+        #   return "rock"
         elif(zHeight<2.01):
             return "hillgrass"
         elif(zHeight<5.01):
