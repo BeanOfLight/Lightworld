@@ -1,9 +1,3 @@
-#########################################################################################
-# LightWorld
-# terrainMap.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 8/10/2019
-
 from panda3d.core import StackedPerlinNoise2, PNMImage
 from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
 import math

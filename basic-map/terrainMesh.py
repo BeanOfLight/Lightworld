@@ -1,24 +1,9 @@
-#########################################################################################
-# LightWorld
-# terrainMesh.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 7/26/2019
-
-
-from panda3d.core import GeomVertexFormat, GeomVertexData
-from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
-from panda3d.core import LVector4f
-
 import random
 import math
 
 from terrainMap import *
 from navigation import *
 from meshing import *
-
-# Description
-# Tiled terrain map in 2x2m tiles
-# Height in discrete increments of 0.5m 
 
 ###############################################################################
 # Class managing texture computation

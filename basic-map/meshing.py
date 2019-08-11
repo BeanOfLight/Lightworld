@@ -1,9 +1,3 @@
-#########################################################################################
-# LightWorld
-# meshing.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 8/10/2019
-
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i, LVector4f

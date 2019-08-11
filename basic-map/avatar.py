@@ -1,9 +1,3 @@
-#########################################################################################
-# LightWorld
-# avatar.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 7/28/2019
-
 from panda3d.core import LVector3
 from navigation import *
 

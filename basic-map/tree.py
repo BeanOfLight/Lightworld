@@ -1,10 +1,4 @@
 #########################################################################################
-# LightWorld
-# tree.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 7/26/2019
-
-#########################################################################################
 # Class TreeInfo, containing all specification for the tree
 class TreeInfor:
     def __init__(self):

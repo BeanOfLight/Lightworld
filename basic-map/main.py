@@ -1,9 +1,3 @@
-#########################################################################################
-# LightWorld
-# main.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 7/26/2019
-
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *

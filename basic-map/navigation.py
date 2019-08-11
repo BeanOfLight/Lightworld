@@ -1,9 +1,3 @@
-#########################################################################################
-# LightWorld
-# navigation.py
-# Author: Bastien Pesenti (bpesenti@yahoo.fr)
-# Date: 8/3/2019
-
 from panda3d.core import LVector3f, LVector3i, LVector2f, LVector2i
 from itertools import cycle
 import math
